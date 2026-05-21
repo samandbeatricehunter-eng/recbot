@@ -1,0 +1,27 @@
+{
+  "name": "@workspace/discord-bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/deploy-commands.ts && tsx src/index.ts",
+    "deploy-commands": "tsx src/deploy-commands.ts",
+    "rollback-franchise": "tsx src/scripts/rollback-franchise-import.ts"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
+    "@workspace/db": "workspace:*",
+    "adm-zip": "^0.5.16",
+    "axios": "^1.15.0",
+    "discord.js": "^14.21.0",
+    "drizzle-orm": "catalog:",
+    "openai": "^6.33.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}
