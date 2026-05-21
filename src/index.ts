@@ -92,7 +92,6 @@ if (!isProduction && !devBotEnabled) {
 
     // User-facing commands
     actions,
-    help,
     h2hrecord,
     globalrecords,
 
