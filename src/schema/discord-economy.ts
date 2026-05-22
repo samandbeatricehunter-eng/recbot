@@ -786,13 +786,53 @@ export const draftPresenceTable = pgTable("draft_presence", {
 
 // ── Game matchup channels (created per week by /advanceweek, deleted on next advance) ──
 export const gameChannelsTable = pgTable("game_channels", {
-  id:           serial("id").primaryKey(),
-  seasonId:     integer("season_id").notNull(),
-  weekIndex:    integer("week_index").notNull(),
-  channelId:    text("channel_id").notNull(),
+  id: serial("id").primaryKey(),
+  guildId: text("guild_id"),
+  seasonId: integer("season_id").notNull(),
+  activeSeasonId: integer("active_season_id"),
+  weekIndex: integer("week_index").notNull(),
+  scheduleGameId: text("schedule_game_id"),
+  channelId: text("channel_id").notNull(),
   awayTeamName: text("away_team_name").notNull().default(""),
   homeTeamName: text("home_team_name").notNull().default(""),
-  createdAt:    timestamp("created_at").notNull().defaultNow(),
+  awayDiscordId: text("away_discord_id"),
+  homeDiscordId: text("home_discord_id"),
+  commissionerRoleId: text("commissioner_role_id"),
+  panelMessageId: text("panel_message_id"),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  channelIdx: uniqueIndex("game_channels_channel_id_idx").on(t.channelId),
+}));
+
+export const gameScheduleProposalsTable = pgTable("game_schedule_proposals", {
+  id: serial("id").primaryKey(),
+  gameChannelId: integer("game_channel_id").notNull(),
+  proposerDiscordId: text("proposer_discord_id").notNull(),
+  opponentDiscordId: text("opponent_discord_id").notNull(),
+  proposedDate: text("proposed_date").notNull(),
+  proposedTime: text("proposed_time").notNull(),
+  timezone: text("timezone").notNull(),
+  proposedAtUtc: timestamp("proposed_at_utc"),
+  notes: text("notes"),
+  status: text("status").notNull().default("pending"),
+  parentProposalId: integer("parent_proposal_id"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const gameAdminRequestsTable = pgTable("game_admin_requests", {
+  id: serial("id").primaryKey(),
+  gameChannelId: integer("game_channel_id").notNull(),
+  requesterDiscordId: text("requester_discord_id").notNull(),
+  requestType: text("request_type").notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  commissionerNotes: text("commissioner_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ── Trade Block: user-posted trade offers ──────────────────────────────────────

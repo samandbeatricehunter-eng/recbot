@@ -52,6 +52,7 @@ export function buildActionsHubEmbed(
         "**Media** — press conferences, headlines, transactions, and rivalries.\n" +
         "**League Operations** — rules, reports, auto-pilot, teams, and commissioner tools."
     )
+    .setImage("attachment://rec-embed-banner.png")
     .setFooter({
       text: "REC League Coaches Office • Menu expires after 15 minutes",
     });
@@ -118,6 +119,7 @@ export function buildUnlinkedHubEmbed(
         "You are not currently linked to a team.\n\n" +
         "Use League Operations to view open/user teams, or contact a commissioner to get linked."
     )
+    .setImage("attachment://rec-embed-banner.png")
     .setFooter({ text: "Contact a commissioner to get linked to a team" });
 }
 

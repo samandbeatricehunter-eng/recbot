@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, serial, pgEnum, json, uniqueIndex, real, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, integer, boolean, timestamp, serial, pgEnum, json, uniqueIndex, real, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -793,6 +793,48 @@ export const gameChannelsTable = pgTable("game_channels", {
   awayTeamName: text("away_team_name").notNull().default(""),
   homeTeamName: text("home_team_name").notNull().default(""),
   createdAt:    timestamp("created_at").notNull().defaultNow(),
+});
+
+export const gameScheduleProposalsTable = pgTable("game_schedule_proposals", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+
+  gameChannelId: bigint("game_channel_id", { mode: "number" })
+    .notNull()
+    .references(() => gameChannelsTable.id, { onDelete: "cascade" }),
+
+  proposerDiscordId: text("proposer_discord_id").notNull(),
+  opponentDiscordId: text("opponent_discord_id").notNull(),
+
+  proposedDate: text("proposed_date").notNull(),
+  proposedTime: text("proposed_time").notNull(),
+  timezone: text("timezone").notNull(),
+
+  proposedAtUtc: timestamp("proposed_at_utc"),
+  notes: text("notes"),
+
+  status: text("status").notNull().default("pending"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const gameAdminRequestsTable = pgTable("game_admin_requests", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+
+  gameChannelId: bigint("game_channel_id", { mode: "number" })
+    .notNull()
+    .references(() => gameChannelsTable.id, { onDelete: "cascade" }),
+
+  requesterDiscordId: text("requester_discord_id").notNull(),
+
+  requestType: text("request_type").notNull(),
+  reason: text("reason"),
+
+  status: text("status").notNull().default("pending"),
+
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ── Trade Block: user-posted trade offers ──────────────────────────────────────

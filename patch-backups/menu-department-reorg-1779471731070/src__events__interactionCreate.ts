@@ -92,8 +92,7 @@ import {
   type InterviewType,
 } from "../commands/interviewrequest.js";
 import { handleActionsInteraction, handleInterviewTypePick } from "../lib/actions-handlers.js";
-import { handleMenuDepartmentInteraction } from "../lib/menu-department-router.js"; import { handleAdminOperationsInteraction } from "../lib/admin-operations-handlers.js";
-import { handleLeagueOperationsMenuInteraction } from "../lib/league-operations-menu.js";
+import { handleAdminOperationsInteraction } from "../lib/admin-operations-handlers.js";
 import { handleGameOfficeInteraction } from "../lib/game-office-handlers.js";
 import { weekLabel } from "../lib/week-helpers.js";
 import {
@@ -157,7 +156,7 @@ export async function execute(interaction: Interaction) {
     // GuildMemberRoleManager exposes .cache (Collection); raw API payloads give a string[]
     const roleCount: number = roles?.cache?.size ?? (Array.isArray(roles) ? roles.length : 0);
     if (roleCount <= 1) {
-      if ((interaction.isStringSelectMenu() || interaction.isButton()) && typeof (interaction as any).customId === "string") { const handledMenuDepartment = await handleMenuDepartmentInteraction(interaction as any); if (handledMenuDepartment) return; } if (interaction.isAutocomplete()) {
+      if (interaction.isAutocomplete()) {
         await interaction.respond([]).catch(() => {});
       } else if (interaction.isRepliable()) {
         await interaction.reply({
@@ -257,13 +256,6 @@ async function handleButton(interaction: ButtonInteraction) {
   if (action?.startsWith("ld_")) {
     await handleLeagueDataButton(interaction);
     return;
-  }
-
-  // ── League Operations / Commissioner Office intercept ─────────────────────
-  // league-ops button intercept
-  if (interaction.customId === "ac_commissioner_office" || interaction.customId === "ac_league_ops_back") {
-    const handled = await handleLeagueOperationsMenuInteraction(interaction);
-    if (handled) return;
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
@@ -2244,13 +2236,6 @@ async function handleButton(interaction: ButtonInteraction) {
 
 // ── String select menu handler ─────────────────────────────────────────────────
 async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
-  // ── League Operations selector intercept ─────────────────────────────────
-  // league-ops select intercept
-  if (interaction.customId === "ac_office_select" && interaction.values?.[0] === "league_operations") {
-    const handled = await handleLeagueOperationsMenuInteraction(interaction);
-    if (handled) return;
-  }
-
   const parts     = interaction.customId.split(":");
   const action    = parts[0]!;
   const sessionId = parts[1] ?? "";

@@ -119,7 +119,9 @@ if (!isProduction && !devBotEnabled) {
     adminLinkTeam,
     adminInventory,
     adminTeamLogo,
-    adminRepostBanners, lottery,
+    adminRepostBanners,
+    adminOperations,
+    lottery,
   ];
 
   for (const command of commands) {
