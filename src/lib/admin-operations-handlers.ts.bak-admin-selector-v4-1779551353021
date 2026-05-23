@@ -43,7 +43,7 @@ import { checkAndNotifyWaitlist } from "../commands/waitlist.js";
 import { buildMatchupBanner, resolveLogoBuf } from "./matchup-image.js";
 import { generateMatchupBreakdown } from "./matchup-ai-breakdown.js";
 import { globalLogoPath } from "./gcs-reader.js";
-import { buildAdminOpsEmbed, buildAdminOpsRows, buildAdminImportAdvanceEmbed, buildAdminImportAdvanceRows, buildAdminEconomyEmbed, buildAdminEconomyRows, buildAdminServerEmbed, buildAdminServerRows } from "../commands/admin-operations.js";
+import { buildAdminOpsEmbed, buildAdminOpsRows } from "../commands/admin-operations.js";
 import { buildPayoutHubEmbed, buildPayoutHubRows } from "./admin-payout-handlers.js";
 import { buildUserDataHubEmbed, buildUserDataHubRows } from "./admin-user-handlers.js";
 import {
@@ -271,29 +271,6 @@ export async function handleAdminOperationsInteraction(interaction: AnyInteracti
       embeds: [buildAdminOpsEmbed(season?.seasonNumber ?? undefined, wkStr)],
       components: buildAdminOpsRows(),
     });
-    return true;
-  }
-
-
-  // ── Selector-based admin hub routing ───────────────────────────────────────
-  if (id === "ao_admin_main_select") {
-    await handleAdminMainSelect(interaction as StringSelectMenuInteraction);
-    return true;
-  }
-  if (id === "ao_admin_import_advance_select") {
-    await handleAdminImportAdvanceSelect(interaction as StringSelectMenuInteraction);
-    return true;
-  }
-  if (id === "ao_admin_economy_select") {
-    await handleAdminEconomySelect(interaction as StringSelectMenuInteraction);
-    return true;
-  }
-  if (id === "ao_admin_server_select") {
-    await handleAdminServerSelect(interaction as StringSelectMenuInteraction);
-    return true;
-  }
-  if (id === "ao_modal_run_weekly_matchups") {
-    await handleRunWeeklyMatchupsModal(interaction as ModalSubmitInteraction);
     return true;
   }
 
@@ -608,164 +585,6 @@ export async function handleAdminOperationsInteraction(interaction: AnyInteracti
   }
 
   return false;
-}
-
-
-// ── Selector-based admin hub routing ─────────────────────────────────────────
-async function getActiveSeasonDisplay(guildId: string) {
-  const season = await getOrCreateActiveSeason(guildId).catch(() => null);
-  const wkStr = season ? weekLabel(season.currentWeek) : undefined;
-  return { season, wkStr };
-}
-
-async function handleAdminMainSelect(interaction: StringSelectMenuInteraction) {
-  const guildId = interaction.guildId!;
-  const selected = interaction.values[0];
-  const { season, wkStr } = await getActiveSeasonDisplay(guildId);
-
-  if (selected === "import_advance") {
-    await interaction.update({
-      embeds: [buildAdminImportAdvanceEmbed(season?.seasonNumber ?? undefined, wkStr)],
-      components: buildAdminImportAdvanceRows(),
-    });
-    return;
-  }
-
-  if (selected === "manage_economy") {
-    await interaction.update({
-      embeds: [buildAdminEconomyEmbed(season?.seasonNumber ?? undefined, wkStr)],
-      components: buildAdminEconomyRows(),
-    });
-    return;
-  }
-
-  if (selected === "manage_server") {
-    await interaction.update({
-      embeds: [buildAdminServerEmbed(season?.seasonNumber ?? undefined, wkStr)],
-      components: buildAdminServerRows(),
-    });
-    return;
-  }
-
-  await interaction.reply({ content: "Unknown admin department.", ephemeral: true });
-}
-
-async function handleAdminImportAdvanceSelect(interaction: StringSelectMenuInteraction) {
-  const selected = interaction.values[0];
-
-  if (selected === "import") return handleLeagueDataHub(interaction as any);
-  if (selected === "advance_week") return handleAdvanceWeek(interaction as any);
-  if (selected === "set_week") return handleSetWeek(interaction as any);
-  if (selected === "set_season") return handleSetSeasonNum(interaction as any);
-  if (selected === "run_weekly_matchups") return handleRunWeeklyMatchups(interaction);
-
-  await interaction.reply({ content: "Unknown Import/Advance action.", ephemeral: true });
-}
-
-async function handleAdminEconomySelect(interaction: StringSelectMenuInteraction) {
-  const selected = interaction.values[0];
-  if (selected === "payouts") return handlePayoutsHub(interaction as any);
-  await interaction.reply({ content: "Unknown economy action.", ephemeral: true });
-}
-
-async function handleAdminServerSelect(interaction: StringSelectMenuInteraction) {
-  const selected = interaction.values[0];
-  if (selected === "user_data") return handleUserDataHub(interaction as any);
-  if (selected === "store_settings") return handleStoreSettingsHub(interaction as any);
-  if (selected === "server_settings") return handleServerSettingsHub(interaction as any);
-  if (selected === "troubleshoot") return handleTroubleshootHub(interaction as any);
-  if (selected === "report_bug") return handleReportBug(interaction as any);
-  await interaction.reply({ content: "Unknown server action.", ephemeral: true });
-}
-
-async function handleRunWeeklyMatchups(interaction: StringSelectMenuInteraction) {
-  const guildId = interaction.guildId!;
-  const season = await getOrCreateActiveSeason(guildId);
-  const currWeek = parseInt(season.currentWeek ?? "1", 10);
-  const defaultW = isNaN(currWeek) ? "1" : String(currWeek);
-
-  const modal = new ModalBuilder()
-    .setCustomId("ao_modal_run_weekly_matchups")
-    .setTitle("Run Weekly Matchups");
-
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
-        .setCustomId("week_num")
-        .setLabel("Week # to run")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMaxLength(2)
-        .setPlaceholder(defaultW)
-        .setValue(defaultW),
-    ),
-  );
-
-  await interaction.showModal(modal);
-}
-
-async function handleRunWeeklyMatchupsModal(interaction: ModalSubmitInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  const guildId = interaction.guildId!;
-  const guild = interaction.guild;
-  if (!guild) {
-    await interaction.editReply({ content: "❌ Could not access guild." });
-    return;
-  }
-
-  const raw = interaction.fields.getTextInputValue("week_num").trim();
-  const weekNum = parseInt(raw, 10);
-  if (isNaN(weekNum) || weekNum < 1 || weekNum > 22) {
-    await interaction.editReply({ content: "❌ Invalid week number. Use 1-22." });
-    return;
-  }
-
-  const season = await getOrCreateActiveSeason(guildId);
-  const scheduleSeasonId = await getScheduleSeasonId(guildId);
-  const displayLabel = weekLabel(String(weekNum));
-
-  await interaction.editReply({ content: "Running weekly matchup workflow: creating game channels first, then posting matchups/GOTW..." });
-
-  let channelSummary = "";
-  try {
-    const result = await createPrivateGameChannelsForWeek({
-      guild,
-      guildId,
-      seasonId: Number(season.id),
-      seasonNumber: Number(season.seasonNumber ?? 1),
-      scheduleSeasonId,
-      weekIndex: weekNum,
-      displayLabel,
-    });
-    channelSummary = "Game channels: " + result.created + " created / " + result.h2hGames + " H2H games.";
-  } catch (err) {
-    console.error("[admin-operations] Run Weekly Matchups channel creation error:", err);
-    channelSummary = "Game channel step failed: " + String(err);
-  }
-
-  try {
-    await runWeeklyMatchupsFlow({
-      client: interaction.client,
-      guild,
-      season,
-      displayWeekNum: weekNum,
-      payoutWeekIndex: null,
-      guildId,
-      replyFn: async ({ content, components }) => {
-        await interaction.followUp({ content, components: components ?? [], ephemeral: true }).catch(() => {});
-      },
-    });
-
-    await interaction.editReply({
-      content: "✅ Run Weekly Matchups completed.\n" + channelSummary,
-    });
-  } catch (err) {
-    console.error("[admin-operations] Run Weekly Matchups post error:", err);
-    await interaction.editReply({
-      content: "⚠️ Game channel step finished, but matchup/GOTW posting failed.\n" + channelSummary + "\nError: " + String(err),
-    });
-  }
 }
 
 // ── Payouts Hub ────────────────────────────────────────────────────────────────

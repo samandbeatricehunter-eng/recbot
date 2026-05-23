@@ -1,41 +1,16 @@
 import type { ServerSettings } from "@workspace/db";
-
-import * as actions                  from "../commands/actions.js";
-import * as adminOperations          from "../commands/admin-operations.js";
-import * as draftPresence            from "../commands/draft-presence.js";
-import * as adminLegend              from "../commands/admin-legend.js";
-import * as adminLegendVault         from "../commands/admin-legendvault.js";
-import * as adminCustomArcetypes     from "../commands/admin-customarchetypes.js";
-import * as adminCustomPlayerSettings from "../commands/admin-customplayersettings.js";
-import * as adminFixPlayerNames      from "../commands/admin-fixplayernames.js";
-import * as adminTeamLogo            from "../commands/admin-team-logo.js";
-import * as lottery                  from "../commands/lottery.js";
+import * as actions from "../commands/actions.js";
 
 /**
  * Builds the list of slash command JSON payloads to register with Discord.
- * Pass `settings` to filter out commands for disabled features so they
- * disappear from the command picker automatically.
- * Pass `null` (default) to include every command regardless of settings.
+ * Public command surface is intentionally limited. Admin workflows are reached
+ * through /menu > League Operations > Commissioner's Office.
  */
 export function buildCommandJSON(settings: ServerSettings | null = null): object[] {
-  const economy    = !settings || settings.coinEconomy;
-  const legends    = economy  && (!settings || settings.legendsEnabled);
-  const custom     = economy  && (!settings || settings.customSuperstarsEnabled);
-
-  const entries: [{ data: { toJSON(): object } }, boolean][] = [
-    [adminOperations,           true],
-    [actions,                   true],
-    [draftPresence,             true],
-    [adminTeamLogo,             true],
-    [lottery,                   true],
-    [adminLegend,               legends],
-    [adminLegendVault,          legends],
-    [adminCustomArcetypes,      custom],
-    [adminCustomPlayerSettings, custom],
-    [adminFixPlayerNames,       custom],
+  const entries: Array<{ data: { toJSON(): object } }> = [
+    actions,
+    
   ];
 
-  return entries
-    .filter(([, include]) => include)
-    .map(([m]) => m.data.toJSON());
+  return entries.map((m) => m.data.toJSON());
 }

@@ -1,120 +1,165 @@
 import {
-  SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits,
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
 } from "discord.js";
+
 import { isAdminUser, getOrCreateActiveSeason } from "../lib/db-helpers.js";
 import { weekLabel } from "../lib/week-helpers.js";
 
 export const data = new SlashCommandBuilder()
   .setName("admin-menu")
-  .setDescription("Admin hub — manage week, season, payouts, rules, and all league settings")
+  .setDescription("Commissioner's Office — manage league operations")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
+function seasonHeader(seasonNum?: number, weekStr?: string): string {
+  return seasonNum != null && weekStr ? "Season " + seasonNum + " - " + weekStr + "\n\n" : "";
+}
+
 export function buildAdminOpsEmbed(seasonNum?: number, weekStr?: string): EmbedBuilder {
-  const header = (seasonNum != null && weekStr)
-    ? `**Season ${seasonNum} · ${weekStr}**\n\n`
-    : "";
   return new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle("⚙️ Admin Operations Hub")
-    .setDescription(header +
-      "**📅 Set Week** — Change the current week without triggering auto-actions.\n" +
-      "**⏩ Advance Week** — Advance to next week with full auto-actions (matchups, GOTW, articles, playoffs).\n" +
-      "**🔢 Set Season** — Jump the active season to a specific number.\n" +
-      "**💰 Payouts** — Open the payout management hub.\n\n" +
-
-      "**📋 Post Matchups/GOTW** — Manually post matchup embeds and GOTW poll for the current week.\n" +
-      "**🎮 Post Game Channels** — Repost banners and AI breakdowns to all game channels.\n" +
-      "**📰 Post Custom Article** — Generate and post a one-off AI article to headlines.\n" +
-      "**🐦 Rerun Media Cycle** — Re-trigger the league Twitter burst for the current week.\n" +
-      "**📜 Rerun Season Historical** — Rebuild the historical records channel for this season.\n\n" +
-
-      "**🏈 League Data** — EA connection, data import, and season data tools.\n" +
-      "**👤 User Data** — Manage individual user economy, records, and links.\n" +
-      "**🏪 Store Settings** — Archetypes, legend templates, prices, and caps.\n" +
-      "**⚙️ Server Settings** — Toggle features, initialize server, manage rules/admins/waitlist.\n\n" +
-
-      "**🔧 Troubleshoot** — Repair and maintenance tools.\n" +
-      "**🐛 Report Bug** — Submit a bug report to the commissioner log."
+    .setColor(0xB68B2D)
+    .setTitle("Commissioner's Office")
+    .setDescription(
+      seasonHeader(seasonNum, weekStr) +
+      "Select an administrative department below.\n\n" +
+      "**Import/Advance**\nLeague data import, advance week, weekly matchups, set week, and set season.\n\n" +
+      "**Manage Economy**\nPayout tools and economy management.\n\n" +
+      "**Manage Server**\nUser data, store settings, server settings, troubleshooting, and bug reports."
     )
-    .setFooter({ text: "Admin Operations Hub — selections expire after 15 minutes" })
+    .setFooter({ text: "Commissioner's Office • selections expire after 15 minutes" })
     .setTimestamp();
 }
 
-export function buildAdminOpsRows(): ActionRowBuilder<ButtonBuilder>[] {
-  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("ao_set_week").setLabel("📅 Set Week").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("ao_advance_week").setLabel("⏩ Advance Week").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("ao_set_season_num").setLabel("🔢 Set Season").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("ao_payouts").setLabel("💰 Payouts").setStyle(ButtonStyle.Primary),
-  );
-  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("ao_post_matchups").setLabel("📋 Post Matchups/GOTW").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("ao_post_game_channels").setLabel("🎮 Post Game Channels").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("ao_post_custom_article").setLabel("📰 Post Custom Article").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("ao_rerun_media").setLabel("🐦 Rerun Media Cycle").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("ao_rerun_hist").setLabel("📜 Rerun Season Historical").setStyle(ButtonStyle.Secondary),
-  );
-  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("ao_league_data").setLabel("🏈 League Data").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("ao_user_data").setLabel("👤 User Data").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("ao_store_settings").setLabel("🏪 Store Settings").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("ao_server_settings").setLabel("⚙️ Server Settings").setStyle(ButtonStyle.Success),
-  );
-  const row4 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("ao_troubleshoot").setLabel("🔧 Troubleshoot").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("ao_report_bug").setLabel("🐛 Report Bug").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close Menu").setStyle(ButtonStyle.Danger),
-  );
-  return [row1, row2, row3, row4];
-}
-
-
-
-function buildAdminMenuSelectorRows(): ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] {
+export function buildAdminOpsRows(): ActionRowBuilder[] {
   const selector = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId("ao_admin_department_select")
-      .setPlaceholder("Select admin department")
+      .setCustomId("ao_admin_main_select")
+      .setPlaceholder("Select an admin department")
       .addOptions(
         {
           label: "Import/Advance",
           value: "import_advance",
-          description: "Import data, advance week, set week/season, run weekly matchups",
+          description: "Import league data, advance, set week/season, weekly matchups",
           emoji: "📥",
         },
         {
           label: "Manage Economy",
           value: "manage_economy",
-          description: "Payouts and economy workflows",
+          description: "Payouts and economy tools",
           emoji: "💰",
         },
         {
           label: "Manage Server",
           value: "manage_server",
-          description: "Users, store settings, server settings, troubleshooting, bug reports",
-          emoji: "🛠️",
+          description: "Users, store/server settings, troubleshoot, bug reports",
+          emoji: "⚙️",
         },
       ),
   );
 
   const close = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId("ao_close")
-      .setLabel("Close")
-      .setStyle(ButtonStyle.Secondary),
+      .setCustomId("ao_hub_close")
+      .setLabel("Close Menu")
+      .setStyle(ButtonStyle.Danger),
   );
 
-  return [selector, close];
+  return [selector as ActionRowBuilder, close as ActionRowBuilder];
+}
+
+export function buildAdminImportAdvanceEmbed(seasonNum?: number, weekStr?: string): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xB68B2D)
+    .setTitle("Commissioner's Office: Import/Advance")
+    .setDescription(
+      seasonHeader(seasonNum, weekStr) +
+      "Choose the import or weekly operations workflow to run.\n\n" +
+      "**Import** — formerly League Data.\n" +
+      "**Advance Week** — advances the active week.\n" +
+      "**Run Weekly Matchups** — creates private game channels, then posts matchups/GOTW.\n" +
+      "**Set Week** — manually set current week.\n" +
+      "**Set Season** — manually set active season number."
+    );
+}
+
+export function buildAdminImportAdvanceRows(): ActionRowBuilder[] {
+  const selector = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("ao_admin_import_advance_select")
+      .setPlaceholder("Select Import/Advance action")
+      .addOptions(
+        { label: "Import", value: "import", description: "League data import tools", emoji: "📥" },
+        { label: "Advance Week", value: "advance_week", description: "Advance the active league week", emoji: "⏩" },
+        { label: "Run Weekly Matchups", value: "run_weekly_matchups", description: "Create game channels, then post matchups/GOTW", emoji: "🏈" },
+        { label: "Set Week", value: "set_week", description: "Manually set the current week", emoji: "📅" },
+        { label: "Set Season", value: "set_season", description: "Manually set active season number", emoji: "🏆" },
+      ),
+  );
+  const back = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ao_hub_back").setLabel("Back").setStyle(ButtonStyle.Secondary),
+  );
+  return [selector as ActionRowBuilder, back as ActionRowBuilder];
+}
+
+export function buildAdminEconomyEmbed(seasonNum?: number, weekStr?: string): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xB68B2D)
+    .setTitle("Commissioner's Office: Manage Economy")
+    .setDescription(seasonHeader(seasonNum, weekStr) + "Choose an economy workflow.");
+}
+
+export function buildAdminEconomyRows(): ActionRowBuilder[] {
+  const selector = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("ao_admin_economy_select")
+      .setPlaceholder("Select economy action")
+      .addOptions({ label: "Payouts", value: "payouts", description: "Open payout management hub", emoji: "💰" }),
+  );
+  const back = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ao_hub_back").setLabel("Back").setStyle(ButtonStyle.Secondary),
+  );
+  return [selector as ActionRowBuilder, back as ActionRowBuilder];
+}
+
+export function buildAdminServerEmbed(seasonNum?: number, weekStr?: string): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xB68B2D)
+    .setTitle("Commissioner's Office: Manage Server")
+    .setDescription(seasonHeader(seasonNum, weekStr) + "Choose a server management workflow.");
+}
+
+export function buildAdminServerRows(): ActionRowBuilder[] {
+  const selector = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("ao_admin_server_select")
+      .setPlaceholder("Select server action")
+      .addOptions(
+        { label: "User Data", value: "user_data", description: "Manage user links, economy, and records", emoji: "👤" },
+        { label: "Store Settings", value: "store_settings", description: "Prices, caps, archetypes, and templates", emoji: "🏪" },
+        { label: "Server Settings", value: "server_settings", description: "Feature toggles, rules, admins, server setup", emoji: "⚙️" },
+        { label: "Troubleshoot", value: "troubleshoot", description: "Repair and maintenance tools", emoji: "🛠️" },
+        { label: "Report Bug", value: "report_bug", description: "Send a bot bug report", emoji: "🐞" },
+      ),
+  );
+  const back = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ao_hub_back").setLabel("Back").setStyle(ButtonStyle.Secondary),
+  );
+  return [selector as ActionRowBuilder, back as ActionRowBuilder];
 }
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  const gid  = interaction.guildId!;
-  const uid  = interaction.user.id;
+  const gid = interaction.guildId!;
+  const uid = interaction.user.id;
 
   const member = await interaction.guild?.members.fetch(uid).catch(() => null);
   const isDiscordAdmin = member?.permissions.has(PermissionFlagsBits.Administrator) ?? false;
-  const isBotAdmin     = await isAdminUser(uid, gid);
+  const isBotAdmin = await isAdminUser(uid, gid);
 
   if (!isDiscordAdmin && !isBotAdmin) {
     await interaction.reply({ content: "❌ You do not have permission to use this command.", ephemeral: true });
@@ -122,7 +167,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const season = await getOrCreateActiveSeason(gid).catch(() => null);
-  const wkStr  = season ? weekLabel(season.currentWeek) : undefined;
+  const wkStr = season ? weekLabel(season.currentWeek) : undefined;
+
   await interaction.reply({
     embeds: [buildAdminOpsEmbed(season?.seasonNumber ?? undefined, wkStr)],
     components: buildAdminOpsRows(),
