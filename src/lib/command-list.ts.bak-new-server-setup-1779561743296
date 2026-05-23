@@ -1,6 +1,5 @@
 import type { ServerSettings } from "@workspace/db";
 import * as actions from "../commands/actions.js";
-import * as newServerSetup from "../commands/new-server-setup.js";
 
 /**
  * Builds the list of slash command JSON payloads to register with Discord.
@@ -10,7 +9,6 @@ import * as newServerSetup from "../commands/new-server-setup.js";
 export function buildCommandJSON(settings: ServerSettings | null = null): object[] {
   const entries: Array<{ data: { toJSON(): object } }> = [
     actions,
-  newServerSetup,
     
   ];
 

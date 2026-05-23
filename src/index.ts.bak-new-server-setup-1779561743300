@@ -2,7 +2,6 @@ import "dotenv/config";
 import { Client, Collection, GatewayIntentBits } from "discord.js";
 import { createServer } from "http";
 import { getOrCreateActiveSeason, normalizeDefensivePositions, PRIMARY_GUILD_ID } from "./lib/db-helpers.js";
-import * as newServerSetup from "./commands/new-server-setup.js";
 
 // ── Unified admin + view commands ────────────────────────────────────────────
 import * as admin         from "./commands/admin.js";
@@ -93,7 +92,6 @@ if (!isProduction && !devBotEnabled) {
 
     // User-facing commands
     actions,
-  newServerSetup,
     h2hrecord,
     globalrecords,
 

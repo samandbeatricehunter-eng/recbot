@@ -1,0 +1,44 @@
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  PermissionFlagsBits,
+} from "discord.js";
+import {
+  buildNewServerSetupIntro,
+  buildNewServerSetupRows,
+  setupIsCompleted,
+  userCanRunNewServerSetup,
+} from "../lib/new-server-setup-handlers.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("new-server-setup")
+  .setDescription("One-time REC League server initialization")
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+
+export async function execute(interaction: ChatInputCommandInteraction) {
+  if (!interaction.inGuild() || !interaction.guildId) {
+    await interaction.reply({ content: "This command can only be used inside a server.", ephemeral: true });
+    return;
+  }
+
+  const allowed = await userCanRunNewServerSetup(interaction);
+  if (!allowed) {
+    await interaction.reply({ content: "❌ Only Discord server administrators can run /new-server-setup.", ephemeral: true });
+    return;
+  }
+
+  const completed = await setupIsCompleted(interaction.guildId);
+  if (completed) {
+    await interaction.reply({
+      content: "✅ This server has already completed REC setup. Use /menu → League Operations → Commissioner’s Office for future changes.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.reply({
+    embeds: [buildNewServerSetupIntro()],
+    components: buildNewServerSetupRows(),
+    ephemeral: true,
+  });
+}

@@ -95,7 +95,6 @@ import { handleActionsInteraction, handleInterviewTypePick } from "../lib/action
 import { handleMenuDepartmentInteraction } from "../lib/menu-department-router.js"; import { handleAdminOperationsInteraction } from "../lib/admin-operations-handlers.js";
 import { handleLeagueOperationsMenuInteraction } from "../lib/league-operations-menu.js";
 import { handleGameOfficeInteraction } from "../lib/game-office-handlers.js";
-import { handleNewServerSetupInteraction } from "../lib/new-server-setup-handlers.js";
 import { weekLabel } from "../lib/week-helpers.js";
 import {
   DRAFT_TOGGLE_PREFIX, DRAFT_CLOSE_BUTTON_ID,
@@ -158,11 +157,7 @@ export async function execute(interaction: Interaction) {
     // GuildMemberRoleManager exposes .cache (Collection); raw API payloads give a string[]
     const roleCount: number = roles?.cache?.size ?? (Array.isArray(roles) ? roles.length : 0);
     if (roleCount <= 1) {
-      if ((interaction.isStringSelectMenu() || interaction.isButton()) && typeof (interaction as any).customId === "string") { const handledMenuDepartment = await handleMenuDepartmentInteraction(interaction as any); if (handledMenuDepartment) return; } if (("customId" in interaction) && typeof (interaction as any).customId === "string" && (interaction as any).customId.startsWith("ns_")) {
-  const handled = await handleNewServerSetupInteraction(interaction as any);
-  if (handled) return;
-}
-if (interaction.isAutocomplete()) {
+      if ((interaction.isStringSelectMenu() || interaction.isButton()) && typeof (interaction as any).customId === "string") { const handledMenuDepartment = await handleMenuDepartmentInteraction(interaction as any); if (handledMenuDepartment) return; } if (interaction.isAutocomplete()) {
         await interaction.respond([]).catch(() => {});
       } else if (interaction.isRepliable()) {
         await interaction.reply({
@@ -232,11 +227,6 @@ if (interaction.isAutocomplete()) {
 
 // ── Button handler ─────────────────────────────────────────────────────────────
 async function handleButton(interaction: ButtonInteraction) {
-  if (interaction.customId?.startsWith("ns_")) {
-    const handled = await handleNewServerSetupInteraction(interaction);
-    if (handled) return;
-  }
-
   const parts = interaction.customId.split(":");
   const [action, secondPart, userId, purchaseType] = parts;
 

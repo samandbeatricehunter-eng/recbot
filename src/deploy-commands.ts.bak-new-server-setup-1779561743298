@@ -25,7 +25,7 @@ async function deploy() {
     const settings = await getServerSettings(guildId).catch(() => null);
     let commands = buildCommandJSON(settings);
     // Only keep the allowed commands: menu
-    const allowed = new Set(["menu", "new-server-setup"]);
+    const allowed = new Set(["menu"]);
     commands = commands.filter((c: any) => allowed.has(c.name));
     console.log(`Registering ${commands.length} commands to guild ${guildId}...`);
     await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
