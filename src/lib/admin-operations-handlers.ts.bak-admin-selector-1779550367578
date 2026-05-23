@@ -58,98 +58,6 @@ import { setGuildChannel } from "./db-helpers.js";
 import { rebuildHistoricalChannel } from "./wildcard-automation.js";
 import OpenAI from "./openai-fallback.js";
 
-
-
-function buildAdminBackRow(): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId("ao_admin_root")
-      .setLabel("Back")
-      .setStyle(ButtonStyle.Secondary),
-  );
-}
-
-function buildAdminRootMenuRows(): ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] {
-  return [
-    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("ao_admin_department_select")
-        .setPlaceholder("Select admin department")
-        .addOptions(
-          { label: "Import/Advance", value: "import_advance", description: "Import, advance, set week/season, weekly matchups", emoji: "📥" },
-          { label: "Manage Economy", value: "manage_economy", description: "Payouts and economy workflows", emoji: "💰" },
-          { label: "Manage Server", value: "manage_server", description: "Users, settings, troubleshooting, bug reports", emoji: "🛠️" },
-        ),
-    ),
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("ao_close").setLabel("Close").setStyle(ButtonStyle.Secondary),
-    ),
-  ];
-}
-
-function buildImportAdvanceMenuRows(): ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] {
-  return [
-    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("ao_import_advance_select")
-        .setPlaceholder("Select Import/Advance workflow")
-        .addOptions(
-          { label: "Import", value: "league_data", description: "Formerly League Data", emoji: "📥" },
-          { label: "Advance Week", value: "advance_week", description: "Advance to the next league week", emoji: "⏭️" },
-          { label: "Run Weekly Matchups", value: "run_weekly_matchups", description: "Post game channels, matchups, and GOTW flow", emoji: "🏈" },
-          { label: "Set Week", value: "set_week", description: "Manually set current week", emoji: "📅" },
-          { label: "Set Season", value: "set_season", description: "Manually set current season", emoji: "🏆" },
-        ),
-    ),
-    buildAdminBackRow(),
-  ];
-}
-
-function buildManageEconomyMenuRows(): ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] {
-  return [
-    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("ao_manage_economy_select")
-        .setPlaceholder("Select Economy workflow")
-        .addOptions(
-          { label: "Payouts", value: "payouts", description: "Open payout management", emoji: "💰" },
-        ),
-    ),
-    buildAdminBackRow(),
-  ];
-}
-
-function buildManageServerMenuRows(): ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] {
-  return [
-    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("ao_manage_server_select")
-        .setPlaceholder("Select Server workflow")
-        .addOptions(
-          { label: "User Data", value: "user_data", description: "Manage user/team data", emoji: "👥" },
-          { label: "Store Settings", value: "store_settings", description: "Manage store options", emoji: "🏪" },
-          { label: "Server Settings", value: "server_settings", description: "Manage server settings", emoji: "⚙️" },
-          { label: "Troubleshoot", value: "troubleshoot", description: "Repair/check bot data", emoji: "🧰" },
-          { label: "Report Bug", value: "report_bug", description: "Report a bot issue", emoji: "🐞" },
-        ),
-    ),
-    buildAdminBackRow(),
-  ];
-}
-
-async function showAdminRootMenu(interaction: any) {
-  await interaction.update({
-    embeds: [new EmbedBuilder().setColor(0xB68B2D).setTitle("Commissioner's Office").setDescription("Select an admin department below.")],
-    components: buildAdminRootMenuRows(),
-  });
-}
-
-async function showAdminDepartmentMenu(interaction: any, title: string, description: string, components: any[]) {
-  await interaction.update({
-    embeds: [new EmbedBuilder().setColor(0xB68B2D).setTitle(title).setDescription(description)],
-    components,
-  });
-}
 const openaiClient = new OpenAI({
   baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
   apiKey:  process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "dummy",
@@ -394,7 +302,7 @@ export async function handleAdminOperationsInteraction(interaction: AnyInteracti
     return true;
   }
 
-  // ──  ───────────────────────────────────────────────────────
+  // ── Post Custom Article ───────────────────────────────────────────────────────
   if (id === "ao_post_custom_article") {
     await handlePostCustomArticle(interaction as ButtonInteraction);
     return true;
@@ -404,13 +312,13 @@ export async function handleAdminOperationsInteraction(interaction: AnyInteracti
     return true;
   }
 
-  // ──  ─────────────────────────────────────────────────────────
+  // ── Rerun Media Cycle ─────────────────────────────────────────────────────────
   if (id === "ao_rerun_media") {
     await handleRerunMedia(interaction as ButtonInteraction);
     return true;
   }
 
-  // ──  ───────────────────────────────────────────────────
+  // ── Rerun Season Historical ───────────────────────────────────────────────────
   if (id === "ao_rerun_hist") {
     await handleRerunHist(interaction as ButtonInteraction);
     return true;
@@ -829,7 +737,7 @@ async function handlePostGameChannelsModal(interaction: ModalSubmitInteraction) 
   }
 }
 
-// ──  ────────────────────────────────────────────────────────
+// ── Post Custom Article ────────────────────────────────────────────────────────
 
 async function handlePostCustomArticle(interaction: ButtonInteraction) {
   const modal = new ModalBuilder()
@@ -909,7 +817,7 @@ async function handleModalCustomArticle(interaction: ModalSubmitInteraction) {
   }
 }
 
-// ──  ──────────────────────────────────────────────────────────
+// ── Rerun Media Cycle ──────────────────────────────────────────────────────────
 
 async function handleRerunMedia(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
@@ -957,7 +865,7 @@ async function handleRerunMedia(interaction: ButtonInteraction) {
   }
 }
 
-// ──  ────────────────────────────────────────────────────
+// ── Rerun Season Historical ────────────────────────────────────────────────────
 
 async function handleRerunHist(interaction: ButtonInteraction) {
   const guildId = interaction.guildId!;
