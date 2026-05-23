@@ -1,3 +1,4 @@
+import { storeRawMcaImport } from "./mca-raw-storage";
 /**
  * league-data-handlers.ts
  *
@@ -554,7 +555,22 @@ export async function handleLeagueDataButton(interaction: ButtonInteraction): Pr
       .limit(1);
 
     if (!season) {
-      await interaction.editReply({ content: "❌ No active season found.", components: [], embeds: [] });
+      
+try {
+  await storeRawMcaImport({
+    guildId: interaction.guildId ?? "",
+    importedBy: interaction.user.id,
+    payload: franchiseData,
+    sourceName: "bot-import",
+    exportType: "full_import",
+  });
+
+  console.log("[MCA RAW STORAGE] Snapshot + raw records stored successfully");
+} catch (err) {
+  console.error("[MCA RAW STORAGE ERROR]", err);
+}
+
+await interaction.editReply({ content: "❌ No active season found.", components: [], embeds: [] });
       return;
     }
 
