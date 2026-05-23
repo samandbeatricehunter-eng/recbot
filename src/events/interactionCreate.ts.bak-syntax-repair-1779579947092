@@ -59,6 +59,24 @@ export const name = "interactionCreate";
 
 export async function execute(interaction: Interaction) {
 
+  // AC EARLY ROUTING SAFETY NET
+  if (
+    (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) &&
+    typeof (interaction as any).customId === "string" &&
+    (interaction as any).customId.startsWith("ac_")
+  ) {
+    try {
+      const handled = await handleActionsInteraction(interaction as any);
+      if (handled) return;
+    } catch (err) {
+      console.error(`[actions] ${(interaction as any).customId}:`, err);
+      const msg = { content: "❌ Something went wrong. Please try again.", ephemeral: true };
+      if ((interaction as any).replied || (interaction as any).deferred) await (interaction as any).followUp(msg).catch(() => {});
+      else await (interaction as any).reply(msg).catch(() => {});
+      return;
+    }
+  }
+
 
   // NSS EARLY ROUTING SAFETY NET
   if (
@@ -212,12 +230,18 @@ async function handleButton(interaction: ButtonInteraction) {
   // ── League Operations / Commissioner Office intercept ─────────────────────
   // league-ops button intercept
   if (interaction.customId === "ac_commissioner_office" || interaction.customId === "ac_league_ops_back") {
-    const handled = await handleActionsInteraction(interaction); return;
+    const handled = {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
     if (handled) return;
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
@@ -2199,7 +2223,10 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
   // ── League Operations selector intercept ─────────────────────────────────
   // league-ops select intercept
   if (interaction.customId === "ac_office_select" && interaction.values?.[0] === "league_operations") {
-    const handled = await handleActionsInteraction(interaction); return;
+    const handled = {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
     if (handled) return;
   }
 
@@ -2220,7 +2247,10 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
@@ -2571,7 +2601,10 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed modal submissions ─────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed modal submissions ─────────
   if (action?.startsWith("ao_")) {

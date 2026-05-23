@@ -1,0 +1,513 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ChatInputCommandInteraction,
+  Colors,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
+  UserSelectMenuBuilder,
+} from "discord.js";
+
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+import { WEEK_SEQUENCE } from "./week-helpers.js";
+
+const SEASON_OPTIONS = Array.from({ length: 9 }, (_, index) => {
+  const season = String(index + 1);
+  return {
+    label: `Season ${season}`,
+    value: season,
+    default: index === 0,
+  };
+});
+
+const ADVANCE_OPTIONS = [
+  { label: "24 Hours", value: "24" },
+  { label: "48 Hours", value: "48" },
+  { label: "72 Hours", value: "72" },
+  { label: "96 Hours", value: "96" },
+  { label: "Custom / Other", value: "custom" },
+];
+
+function normalizeWeekLabel(value: string): string {
+  if (value.startsWith("week_")) return `Week ${value.replace("week_", "")}`;
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export async function setupIsCompleted(guildId: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT setup_completed
+    FROM server_settings
+    WHERE guild_id = ${guildId}
+    LIMIT 1
+  `);
+
+  return Boolean((result as any).rows?.[0]?.setup_completed);
+}
+
+export async function userCanRunNewServerSetup(
+  interaction: ChatInputCommandInteraction | any,
+): Promise<boolean> {
+  const member = interaction.member;
+
+  return Boolean(
+    member?.permissions?.has?.(PermissionFlagsBits.Administrator),
+  );
+}
+
+async function ensureServerSettings(guildId: string) {
+  await db.execute(sql`
+    INSERT INTO server_settings (guild_id)
+    VALUES (${guildId})
+    ON CONFLICT (guild_id) DO NOTHING
+  `);
+}
+
+async function getSetupState(guildId: string) {
+  const result = await db.execute(sql`
+    SELECT season_number, current_week, advance_hours
+    FROM new_server_setups
+    WHERE guild_id = ${guildId}
+    LIMIT 1
+  `);
+
+  return (result as any).rows?.[0] ?? {};
+}
+
+async function upsertSetupState(
+  guildId: string,
+  userId: string,
+  updates: {
+    seasonNumber?: number;
+    currentWeek?: string;
+    advanceHours?: number | null;
+  },
+) {
+  await db.execute(sql`
+    INSERT INTO new_server_setups (
+      guild_id,
+      started_by,
+      season_number,
+      current_week,
+      advance_hours,
+      status
+    )
+    VALUES (
+      ${guildId},
+      ${userId},
+      ${updates.seasonNumber ?? null},
+      ${updates.currentWeek ?? null},
+      ${updates.advanceHours ?? null},
+      'in_progress'
+    )
+    ON CONFLICT (guild_id) DO UPDATE SET
+      season_number = COALESCE(EXCLUDED.season_number, new_server_setups.season_number),
+      current_week = COALESCE(EXCLUDED.current_week, new_server_setups.current_week),
+      advance_hours = COALESCE(EXCLUDED.advance_hours, new_server_setups.advance_hours),
+      updated_at = NOW()
+  `);
+}
+
+export function buildNewServerSetupIntro(): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xb68b2d)
+    .setTitle("REC League: New Server Setup")
+    .setDescription(
+      [
+        "This one-time setup initializes the server for REC League operations.",
+        "",
+        "**Step 1:** Select up to 6 commissioners.",
+        "**Step 2:** Review/Edit structured league rules.",
+        "**Step 3:** Set season, week, and advance cadence.",
+        "",
+        "The commissioner picker uses Discord's searchable user selector, so it works in large servers and is not limited to 25 users.",
+      ].join("\n"),
+    );
+}
+
+export function buildNewServerSetupRows(): ActionRowBuilder<any>[] {
+  const commissioners =
+    new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
+      new UserSelectMenuBuilder()
+        .setCustomId("ns_commissioners_select")
+        .setPlaceholder("Select 1-6 commissioners")
+        .setMinValues(1)
+        .setMaxValues(6),
+    );
+
+  const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("ns_edit_rules")
+      .setLabel("Review/Edit Rules")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId("ns_league_settings")
+      .setLabel("Set Season / Week / Advance")
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  return [commissioners, buttons];
+}
+
+function progressEmbed(text: string): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xb68b2d)
+    .setTitle("REC League: New Server Setup")
+    .setDescription(text);
+}
+
+function buildLeagueSettingsEmbed(state: any): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(0xb68b2d)
+    .setTitle("REC League: Season / Week / Advance")
+    .setDescription(
+      [
+        "Choose the season, week, and advance cadence below.",
+        "",
+        `**Season:** ${state.season_number ?? 1}`,
+        `**Week:** ${state.current_week ? normalizeWeekLabel(String(state.current_week)) : "Not selected"}`,
+        `**Advance:** ${state.advance_hours ? `${state.advance_hours} hours` : "Not selected"}`,
+        "",
+        "Once all three are selected, click **Complete Setup**.",
+      ].join("\n"),
+    );
+}
+
+function buildLeagueSettingsRows(state: any): ActionRowBuilder<any>[] {
+  const selectedSeason = String(state.season_number ?? "1");
+  const selectedWeek = String(state.current_week ?? "");
+  const selectedAdvance = String(state.advance_hours ?? "");
+
+  const seasonRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("ns_select_season")
+      .setPlaceholder("Select current season")
+      .addOptions(
+        SEASON_OPTIONS.map((option) => ({
+          ...option,
+          default: option.value === selectedSeason,
+        })),
+      ),
+  );
+
+  const weekRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("ns_select_week")
+      .setPlaceholder("Select current week")
+      .addOptions(
+        WEEK_SEQUENCE.map((week) => ({
+          label: normalizeWeekLabel(week),
+          value: week,
+          default: week === selectedWeek,
+        })),
+      ),
+  );
+
+  const advanceRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("ns_select_advance")
+      .setPlaceholder("Select advance cadence")
+      .addOptions(
+        ADVANCE_OPTIONS.map((option) => ({
+          ...option,
+          default: option.value === selectedAdvance,
+        })),
+      ),
+  );
+
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("ns_complete_setup")
+      .setLabel("Complete Setup")
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId("ns_back_to_setup")
+      .setLabel("Back")
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return [seasonRow, weekRow, advanceRow, buttonRow];
+}
+
+async function showLeagueSettings(interaction: any) {
+  const state = await getSetupState(interaction.guildId);
+
+  const payload = {
+    embeds: [buildLeagueSettingsEmbed(state)],
+    components: buildLeagueSettingsRows(state),
+  };
+
+  if (interaction.deferred || interaction.replied) {
+    await interaction.editReply(payload);
+  } else if (interaction.isButton?.() || interaction.isStringSelectMenu?.()) {
+    await interaction.update(payload);
+  } else {
+    await interaction.reply({ ...payload, ephemeral: true });
+  }
+}
+
+export async function handleNewServerSetupInteraction(
+  interaction: any,
+): Promise<boolean> {
+  const customId = interaction.customId;
+
+  if (!customId?.startsWith?.("ns_")) {
+    return false;
+  }
+
+  if (!interaction.guildId) {
+    await interaction.reply({
+      content: "This setup can only be used inside a server.",
+      ephemeral: true,
+    });
+
+    return true;
+  }
+
+  const isAdmin = Boolean(
+    interaction.member?.permissions?.has?.(PermissionFlagsBits.Administrator),
+  );
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: "Only Discord server administrators can use this setup.",
+      ephemeral: true,
+    });
+
+    return true;
+  }
+
+  await ensureServerSettings(interaction.guildId);
+
+  if (
+    customId === "ns_commissioners_select" &&
+    interaction.isUserSelectMenu()
+  ) {
+    const ids = interaction.values.slice(0, 6);
+
+    for (const discordId of ids) {
+      await db.execute(sql`
+        INSERT INTO league_commissioners (
+          guild_id,
+          discord_id,
+          role,
+          created_by
+        )
+        VALUES (
+          ${interaction.guildId},
+          ${discordId},
+          'commissioner',
+          ${interaction.user.id}
+        )
+        ON CONFLICT (guild_id, discord_id)
+        DO NOTHING
+      `);
+
+      await db.execute(sql`
+        INSERT INTO league_members (
+          guild_id,
+          discord_id,
+          role,
+          is_commissioner
+        )
+        VALUES (
+          ${interaction.guildId},
+          ${discordId},
+          'commissioner',
+          true
+        )
+        ON CONFLICT (guild_id, discord_id)
+        DO UPDATE SET
+          role = 'commissioner',
+          is_commissioner = true,
+          updated_at = NOW()
+      `);
+    }
+
+    await interaction.update({
+      embeds: [
+        progressEmbed(
+          "Commissioners saved. Next: review/edit rules and configure season settings.",
+        ),
+      ],
+      components: buildNewServerSetupRows(),
+    });
+
+    return true;
+  }
+
+  if (customId === "ns_edit_rules" && interaction.isButton()) {
+    await interaction.update({
+      embeds: [
+        progressEmbed(
+          "Opening the structured rules manager. Use the rules controls below. When finished, use /new-server-setup again if the setup panel is no longer visible.",
+        ),
+      ],
+      components: [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId("ao_rules")
+            .setLabel("Open Rules Manager")
+            .setStyle(ButtonStyle.Primary),
+
+          new ButtonBuilder()
+            .setCustomId("ns_back_to_setup")
+            .setLabel("Back to Setup")
+            .setStyle(ButtonStyle.Secondary),
+        ),
+      ],
+    });
+
+    return true;
+  }
+
+  if (customId === "ns_back_to_setup" && interaction.isButton()) {
+    await interaction.update({
+      embeds: [buildNewServerSetupIntro()],
+      components: buildNewServerSetupRows(),
+    });
+
+    return true;
+  }
+
+  if (customId === "ns_league_settings" && interaction.isButton()) {
+    await showLeagueSettings(interaction);
+    return true;
+  }
+
+  if (customId === "ns_select_season" && interaction.isStringSelectMenu()) {
+    const seasonNumber = Number(interaction.values[0]);
+
+    if (!Number.isInteger(seasonNumber) || seasonNumber < 1 || seasonNumber > 9) {
+      await interaction.reply({
+        content: "Season must be a whole number from 1 through 9.",
+        ephemeral: true,
+      });
+      return true;
+    }
+
+    await upsertSetupState(interaction.guildId, interaction.user.id, {
+      seasonNumber,
+    });
+
+    await showLeagueSettings(interaction);
+    return true;
+  }
+
+  if (customId === "ns_select_week" && interaction.isStringSelectMenu()) {
+    const currentWeek = String(interaction.values[0]);
+
+    await upsertSetupState(interaction.guildId, interaction.user.id, {
+      currentWeek,
+    });
+
+    await showLeagueSettings(interaction);
+    return true;
+  }
+
+  if (customId === "ns_select_advance" && interaction.isStringSelectMenu()) {
+    const selected = String(interaction.values[0]);
+
+    if (selected === "custom") {
+      await interaction.reply({
+        content:
+          "Custom advance hours will be added next. For now, choose 24, 48, 72, or 96 to complete setup.",
+        ephemeral: true,
+      });
+      return true;
+    }
+
+    const advanceHours = Number(selected);
+
+    await upsertSetupState(interaction.guildId, interaction.user.id, {
+      advanceHours,
+    });
+
+    await showLeagueSettings(interaction);
+    return true;
+  }
+
+  if (customId === "ns_complete_setup" && interaction.isButton()) {
+    const state = await getSetupState(interaction.guildId);
+
+    const seasonNumber = Number(state.season_number ?? 1);
+    const currentWeek = String(state.current_week ?? "week_1");
+    const advanceHours = Number(state.advance_hours ?? 24);
+
+    if (!Number.isInteger(seasonNumber) || seasonNumber < 1 || seasonNumber > 9) {
+      await interaction.reply({
+        content: "Select a valid season from 1 through 9 first.",
+        ephemeral: true,
+      });
+      return true;
+    }
+
+    await db.execute(sql`
+      UPDATE seasons
+      SET is_active = false
+      WHERE guild_id = ${interaction.guildId}
+    `);
+
+    await db.execute(sql`
+      INSERT INTO seasons (
+        guild_id,
+        season_number,
+        is_active,
+        current_week
+      )
+      VALUES (
+        ${interaction.guildId},
+        ${seasonNumber},
+        true,
+        ${currentWeek}
+      )
+    `);
+
+    await db.execute(sql`
+      UPDATE server_settings
+      SET
+        setup_completed = true,
+        setup_completed_at = NOW(),
+        setup_completed_by = ${interaction.user.id},
+        advance_hours = ${advanceHours},
+        updated_at = NOW()
+      WHERE guild_id = ${interaction.guildId}
+    `);
+
+    await db.execute(sql`
+      UPDATE new_server_setups
+      SET
+        completed_by = ${interaction.user.id},
+        season_number = ${seasonNumber},
+        current_week = ${currentWeek},
+        advance_hours = ${advanceHours},
+        status = 'completed',
+        completed_at = NOW(),
+        updated_at = NOW()
+      WHERE guild_id = ${interaction.guildId}
+    `);
+
+    await interaction.update({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(Colors.Green)
+          .setTitle("REC Server Setup Complete")
+          .setDescription(
+            "Server initialization is complete. Next step: import league data.",
+          ),
+      ],
+      components: [],
+    });
+
+    return true;
+  }
+
+  return false;
+}

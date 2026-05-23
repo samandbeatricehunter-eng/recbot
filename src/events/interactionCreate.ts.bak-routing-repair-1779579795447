@@ -59,7 +59,6 @@ export const name = "interactionCreate";
 
 export async function execute(interaction: Interaction) {
 
-
   // NSS EARLY ROUTING SAFETY NET
   if (
     (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) &&
@@ -212,12 +211,15 @@ async function handleButton(interaction: ButtonInteraction) {
   // ── League Operations / Commissioner Office intercept ─────────────────────
   // league-ops button intercept
   if (interaction.customId === "ac_commissioner_office" || interaction.customId === "ac_league_ops_back") {
-    const handled = await handleActionsInteraction(interaction); return;
+    const handled = await handleLeagueOperationsMenuInteraction(interaction);
     if (handled) return;
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
@@ -2199,7 +2201,7 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
   // ── League Operations selector intercept ─────────────────────────────────
   // league-ops select intercept
   if (interaction.customId === "ac_office_select" && interaction.values?.[0] === "league_operations") {
-    const handled = await handleActionsInteraction(interaction); return;
+    const handled = await handleLeagueOperationsMenuInteraction(interaction);
     if (handled) return;
   }
 
@@ -2220,7 +2222,10 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
@@ -2571,7 +2576,10 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed modal submissions ─────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed modal submissions ─────────
   if (action?.startsWith("ao_")) {

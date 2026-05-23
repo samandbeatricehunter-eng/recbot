@@ -32,20 +32,16 @@ type SetupInteraction =
 const SETUP_PREFIX = "nss_";
 const LEGACY_SETUP_PREFIX = "ns_";
 
-const SETUP_WEEK_VALUES = [
-  "preseason",
-  ...WEEK_SEQUENCE.filter((week) =>
-    week !== "preseason" &&
-    !week.startsWith("preseason_") &&
-    week !== "training_camp"
-  ),
+const SETUP_WEEK_OPTIONS = [
+  new StringSelectMenuOptionBuilder().setLabel("Preseason").setValue("preseason"),
+  ...WEEK_SEQUENCE
+    .filter((week) => !week.startsWith("preseason_") && week !== "training_camp")
+    .map((week) =>
+      new StringSelectMenuOptionBuilder()
+        .setLabel(weekLabel(week))
+        .setValue(week),
+    ),
 ];
-
-const SETUP_WEEK_OPTIONS = Array.from(new Set(SETUP_WEEK_VALUES)).map((week) =>
-  new StringSelectMenuOptionBuilder()
-    .setLabel(week === "preseason" ? "Preseason" : weekLabel(week))
-    .setValue(week),
-);
 
 const ADVANCE_OPTIONS = [
   { label: "24 Hours", value: "24" },

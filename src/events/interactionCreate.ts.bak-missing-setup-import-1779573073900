@@ -1,3 +1,101 @@
+import {
+  Interaction, ButtonInteraction, StringSelectMenuInteraction,
+  EmbedBuilder, Colors,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+  ModalBuilder, TextInputBuilder, TextInputStyle, ModalSubmitInteraction,
+  TextChannel,
+} from "discord.js";
+import { db } from "@workspace/db";
+import {
+  purchasesTable, inventoryTable, legendsTable, usersTable,
+  interviewRequestsTable, wagersTable,
+  franchiseScheduleTable, seasonsTable,
+  pendingEosPayoutsTable, seasonStatTierConfigsTable,
+  pendingChannelPayoutsTable,
+  statPaddingViolationsTable, seasonStatsTable,
+} from "@workspace/db";
+import { CORE_ATTRIBUTES } from "../lib/constants.js";
+import { STAT_CATEGORIES, STAT_TIER_DEFAULTS } from "../lib/stat-categories.js";
+import { pendingCoCommActions, purgeExpiredCoCommActions } from "../lib/pending-cocomm-actions.js";
+import { executeAdminAction, type AdminActionContext } from "../lib/admin-actions.js";
+import {
+  handleCcpPreConfirm,
+  handleCcpPos, handleCcpArch, handleCcpArchPrev, handleCcpArchNext, handleCcpArchPick,
+  handleCcpAttrPagePrev, handleCcpAttrPageNext,
+  handleCcpOlPos, handleCcpDev, handleCcpPkg,
+  handleCcpAttrSel, handleCcpAttrSelPrev, handleCcpAttrSelNext, handleCcpAttrAdjust,
+  handleCcpSubmitAttrs, handleCcpConfirm, handleCcpCancel,
+  handleCcpModal, handleCcpHand, handleCcpHeight, handleCcpWeight,
+  handleCcpApplied, handleCcpRefund, handleCcpRefundModal,
+  handleCcpMotionStyle, handleCcpQbDetailsModal, handleCcpAppearanceModal,
+} from "../lib/custom-player-interactions.js";
+import { handleViewArchetypeSelect, handleVcaNav, handleVcaAttrPageNav } from "../commands/viewcustomarchetypes.js";
+import { handleTeamSelect, handlePositionSelect, handlePlayerSelect } from "../commands/viewplayerstats.js";
+import { handleAcpPositionSelect, handleAcpPlayerSelect } from "../commands/admin-inventory.js";
+import {
+  handleCancel as apHandleCancel,
+  handleGotw, handleGotwSelectAfc, handleGotwSelectNfc, handleGotwFinalize,
+  handlePotw,
+  handlePotwSelectAfc, handlePotwSelectNfc, handlePotwBack, handlePotwFinalize,
+  handleClose,
+  handleAddCoins, handleAddCoinsSelectAfc, handleAddCoinsSelectNfc, handleAddCoinsNext, handleAddCoinsModal,
+  handleRemoveCoins, handleRemoveCoinsSelectAfc, handleRemoveCoinsSelectNfc, handleRemoveCoinsNext, handleRemoveCoinsModal,
+  handleTransfer, handleTransferSelectAfc, handleTransferSelectNfc, handleTransferNext, handleTransferModal,
+  handleGame, handleGameSelect, handleGameWinnerHome, handleGameWinnerAway, handleGameWinnerCpu,
+  handleGameModalHomeWins, handleGameModalAwayWins, handleGameModalCpuWins,
+  handleCorrect, handleCorrectWeekSelect, handleCorrectGameSelect,
+  handleCorrectNewWinner, handleCorrectSwap, handleCorrectModalSame, handleCorrectModalSwap,
+  handleSetPay, handleSetPayReg, handleSetPayRegModal, handleSetPayPlayoff, handleSetPayChannel, handleSetPayChannelModal,
+  handleSetPayPo1Btn, handleSetPayPo2Btn, handleSetPayPo1Modal, handleSetPayPo2Modal,
+  handleNewMember, handleNewMemberModal,
+  handleGotwBonus, handleGotwBonusModal,
+  handlePotwBonus, handlePotwBonusModal,
+  handleReferral, handleReferralModal,
+  handleEos, handleEosKeySelect, handleEosEditModal, handleEosStatTierModal,
+  handleMilestone, handleMilestoneAdd, handleMilestoneEdit, handleMilestoneEditModal,
+  handleTweetPayout, handleTweetPayoutModal,
+  handleInterviewPayout, handleInterviewPayoutModal,
+} from "../lib/admin-payout-handlers.js";
+import {
+  handleUdClose, handleUdCancel,
+  handleUdViewTeams,
+  handleUdLink, handleUdLinkTeamAfc, handleUdLinkTeamNfc, handleUdLinkMember, handleUdLinkNext, handleUdLinkModal,
+  handleUdUnlink, handleUdUnlinkTeamAfc, handleUdUnlinkTeamNfc, handleUdUnlinkConfirm,
+  handleUdViewEdit, handleUdVeTeamAfc, handleUdVeTeamNfc, handleUdVeLoad,
+  handleUdEditEconomy, handleUdEditRecords, handleUdEditAllTime,
+  handleUdEditEconomyModal, handleUdEditRecordsModal, handleUdEditAllTimeModal,
+  handleUdDelete, handleUdDeleteUserSelect, handleUdDeleteToggle, handleUdDeleteConfirm,
+  handleTreqLinkButton, handleTreqDenyButton, handleTreqDenyReasonModal,
+} from "../lib/admin-user-handlers.js";
+import {
+  handleSsClose, handleSsCancel,
+  handleSsArch, handleSsArchPrev, handleSsArchNext, handleSsArchEdit, handleSsArchBackToView,
+  handleSsLt, handleSsLtEdit, handleSsLtCreate, handleSsLtBackToPos, handleSsLtBackToModel, handleSsLtBackToView,
+  handleSsArchPos, handleSsArchEditGroup,
+  handleSsLtPos, handleSsLtLegend, handleSsLtModel, handleSsLtEditGroup,
+  handleSsArchEditModal, handleSsLtEditModal,
+} from "../lib/admin-store-handlers.js";
+import { eq, and, sql, inArray, count } from "drizzle-orm";
+import {
+  addBalance, deductBalance, logTransaction,
+  getOrCreateActiveSeason, getOrCreateUser, isAdminUser,
+  getSeasonRules, getGuildChannel, CHANNEL_KEYS,
+} from "../lib/db-helpers.js";
+import {
+  getServerSettings, toggleFeature, buildSettingsEmbed, buildSettingsRows,
+  FEATURE_LABELS,
+} from "../lib/server-settings.js";
+import { registerCommandsForGuild } from "../lib/register-commands.js";
+import {
+  INTERVIEW_QUESTIONS, getQuestionPool, interviewTypeLabel,
+  type InterviewType,
+} from "../commands/interviewrequest.js";
+import { handleActionsInteraction, handleInterviewTypePick } from "../lib/actions-handlers.js";
+import { handleMenuDepartmentInteraction } from "../lib/menu-department-router.js"; import { handleAdminOperationsInteraction } from "../lib/admin-operations-handlers.js";
+import { handleLeagueOperationsMenuInteraction } from "../lib/league-operations-menu.js";
+import { handleGameOfficeInteraction } from "../lib/game-office-handlers.js";
+import { handleNewServerSetupInteraction } from "../lib/new-server-setup-handlers.js";
 import { weekLabel } from "../lib/week-helpers.js";
 import {
   DRAFT_TOGGLE_PREFIX, DRAFT_CLOSE_BUTTON_ID,
@@ -42,11 +140,6 @@ import {
 
 
 
-import {
-  handleNewServerSetupInteraction,
-  isNewServerSetupCustomId,
-} from "../lib/new-server-setup-handlers.js";
-
 function computeIsSetupInteraction(interaction: Interaction): boolean {
   return (
     (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) &&
@@ -58,7 +151,6 @@ function computeIsSetupInteraction(interaction: Interaction): boolean {
 export const name = "interactionCreate";
 
 export async function execute(interaction: Interaction) {
-
 
   // NSS EARLY ROUTING SAFETY NET
   if (
@@ -212,12 +304,15 @@ async function handleButton(interaction: ButtonInteraction) {
   // ── League Operations / Commissioner Office intercept ─────────────────────
   // league-ops button intercept
   if (interaction.customId === "ac_commissioner_office" || interaction.customId === "ac_league_ops_back") {
-    const handled = await handleActionsInteraction(interaction); return;
+    const handled = await handleLeagueOperationsMenuInteraction(interaction);
     if (handled) return;
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
@@ -2199,7 +2294,7 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
   // ── League Operations selector intercept ─────────────────────────────────
   // league-ops select intercept
   if (interaction.customId === "ac_office_select" && interaction.values?.[0] === "league_operations") {
-    const handled = await handleActionsInteraction(interaction); return;
+    const handled = await handleLeagueOperationsMenuInteraction(interaction);
     if (handled) return;
   }
 
@@ -2220,7 +2315,10 @@ async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
@@ -2571,7 +2669,10 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed modal submissions ─────────────────
-  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+  if (action?.startsWith("ac_")) {
+    const handled = await handleActionsInteraction(interaction);
+    if (handled) return;
+  }
 
   // ── Admin Operations hub — dispatch all ao_ prefixed modal submissions ─────────
   if (action?.startsWith("ao_")) {

@@ -1,7 +1,5 @@
 export const WEEK_SEQUENCE = [
-  "preseason_1",
-  "preseason_2",
-  "preseason_3",
+  "preseason",
   "week_1",
   "week_2",
   "week_3",
