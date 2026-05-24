@@ -629,7 +629,11 @@ export async function normalizeDefensivePositions(): Promise<void> {
   for (const [newPos, oldSet] of [["OL", OL_SET], ["DL", DL_SET], ["LB", LB_SET], ["DB", DB_SET]] as const) {
     const inClause = toSql(oldSet);
     await db.execute(sql.raw(`UPDATE legends   SET position        = '${newPos}' WHERE position        IN (${inClause})`));
-    await db.execute(sql.raw(`UPDATE inventory SET player_position = '${newPos}' WHERE player_position IN (${inClause})`));
+    try {
+      try {
+      await db.execute(sql.raw(`UPDATE inventory SET player_position = '${newPos}' WHERE player_position IN (${inClause})`));
+    } catch { /* inventory.player_position column absent in this schema — safe to skip */ }
+    } catch { /* inventory.player_position column absent in this schema — safe to skip */ }
     await db.execute(sql.raw(`UPDATE purchases SET player_position = '${newPos}' WHERE player_position IN (${inClause})`));
   }
 

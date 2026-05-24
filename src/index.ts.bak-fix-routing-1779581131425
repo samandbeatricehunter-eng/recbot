@@ -17,6 +17,7 @@ import * as adminEosTestrun          from "./commands/admin-eos-testrun.js";
 import * as adminCancelResendEos     from "./commands/admin-cancel-resend-eos.js";
 import * as adminRebuildHistorical   from "./commands/admin-rebuild-historical.js";
 import * as draftPresence            from "./commands/draft-presence.js";
+import * as adminResendArticle       from "./commands/admin-resendarticle.js";
 import * as adminCatchup             from "./commands/admin-catchup.js";
 import * as adminRollbackFranchise   from "./commands/admin-rollback-franchise.js";
 import * as adminResetSeasonStats    from "./commands/admin-reset-season-stats.js";
@@ -49,6 +50,7 @@ import * as guildMemberAdd    from "./events/guildMemberAdd.js";
 // ── Helpers ────────────────────────────────────────────────────────────────────
 import { startSavingsInterestScheduler } from "./lib/savings-interest.js";
 import { startPollChecker }              from "./lib/poll-checker.js";
+import { startLeagueTwitterScheduler }   from "./lib/league-twitter.js";
 
 // ── Global crash protection ────────────────────────────────────────────────────
 process.on("unhandledRejection", (reason) => {
@@ -100,6 +102,7 @@ if (!isProduction && !devBotEnabled) {
     adminCancelResendEos,
     adminRebuildHistorical,
     draftPresence,
+    adminResendArticle,
     adminCatchup,
     adminRollbackFranchise,
     adminResetSeasonStats,
@@ -148,6 +151,7 @@ if (!isProduction && !devBotEnabled) {
   client.once("ready", () => {
     startPollChecker(client);
     startSavingsInterestScheduler();
+    startLeagueTwitterScheduler(client);
   });
 
   init()

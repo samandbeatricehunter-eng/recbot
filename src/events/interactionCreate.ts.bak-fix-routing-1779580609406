@@ -46,164 +46,7 @@ import {
   handleNewServerSetupInteraction,
   isNewServerSetupCustomId,
 } from "../lib/new-server-setup-handlers.js";
-import { handleMenuDepartmentInteraction } from "../lib/menu-department-router.js";
 
-import {
-  handleActionsInteraction,
-} from "../lib/actions-handlers.js";
-import { handleAdminOperationsInteraction } from "../lib/admin-operations-handlers.js";
-import {
-  handleClose,
-  handleGotw,
-  handleGotwSelectAfc,
-  handleGotwSelectNfc,
-  handleGotwFinalize,
-  handleGotwBonus,
-  handleGotwBonusModal,
-  handlePotw,
-  handlePotwSelectAfc,
-  handlePotwSelectNfc,
-  handlePotwBack,
-  handlePotwFinalize,
-  handlePotwBonus,
-  handlePotwBonusModal,
-  handleAddCoins,
-  handleAddCoinsSelectAfc,
-  handleAddCoinsSelectNfc,
-  handleAddCoinsNext,
-  handleAddCoinsModal,
-  handleRemoveCoins,
-  handleRemoveCoinsNext,
-  handleRemoveCoinsModal,
-  handleTransfer,
-  handleTransferSelectAfc,
-  handleTransferSelectNfc,
-  handleTransferNext,
-  handleTransferModal,
-  handleGame,
-  handleGameSelect,
-  handleGameWinnerHome,
-  handleGameWinnerAway,
-  handleGameWinnerCpu,
-  handleGameModalHomeWins,
-  handleGameModalAwayWins,
-  handleGameModalCpuWins,
-  handleCorrect,
-  handleCorrectWeekSelect,
-  handleCorrectGameSelect,
-  handleCorrectNewWinner,
-  handleCorrectSwap,
-  handleCorrectModalSame,
-  handleCorrectModalSwap,
-  handleSetPay,
-  handleSetPayReg,
-  handleSetPayRegModal,
-  handleSetPayChannel,
-  handleSetPayChannelModal,
-  handleSetPayHighlightCapModal,
-  handleSetPayPlayoff,
-  handleSetPayPo1Btn,
-  handleSetPayPo2Btn,
-  handleSetPayPo1Modal,
-  handleSetPayPo2Modal,
-  handleNewMember,
-  handleNewMemberModal,
-  handleReferral,
-  handleReferralModal,
-  handleEos,
-  handleEosKeySelect,
-  handleEosEditModal,
-  handleEosStatTierModal,
-  handleMilestone,
-  handleMilestoneAdd,
-  handleMilestoneEdit,
-  handleMilestoneEditModal,Modal,Modal,
-} from "../lib/admin-payout-handlers.js";
-import {
-  handleSsClose,
-  handleSsCancel,
-  handleSsArch,
-  handleSsArchPos,
-  handleSsArchPrev,
-  handleSsArchNext,
-  handleSsArchEdit,
-  handleSsArchBackToView,
-  handleSsArchEditGroup,
-  handleSsArchEditModal,
-  handleSsLt,
-  handleSsLtPos,
-  handleSsLtLegend,
-  handleSsLtModel,
-  handleSsLtBackToPos,
-  handleSsLtBackToModel,
-  handleSsLtEdit,
-  handleSsLtCreate,
-  handleSsLtBackToView,
-  handleSsLtEditGroup,
-  handleSsLtEditModal,
-} from "../lib/admin-store-handlers.js";
-import {
-  handleUdClose,
-  handleUdCancel,
-  handleUdViewTeams,
-  handleUdLink,
-  handleUdLinkTeamAfc,
-  handleUdLinkTeamNfc,
-  handleUdLinkMember,
-  handleUdLinkNext,
-  handleUdLinkModal,
-  handleUdUnlink,
-  handleUdUnlinkTeamAfc,
-  handleUdUnlinkTeamNfc,
-  handleUdUnlinkConfirm,
-  handleUdViewEdit,
-  handleUdVeTeamAfc,
-  handleUdVeTeamNfc,
-  handleUdVeLoad,
-  handleUdEditEconomy,
-  handleUdEditRecords,
-  handleUdEditAllTime,
-  handleUdEditEconomyModal,
-  handleUdEditRecordsModal,
-  handleUdEditAllTimeModal,
-  handleUdDelete,
-  handleUdDeleteUserSelect,
-  handleUdDeleteToggle,
-  handleUdDeleteConfirm,
-  handleTreqLinkButton,
-  handleTreqDenyButton,
-  handleTreqDenyReasonModal,
-} from "../lib/admin-user-handlers.js";
-import {
-  handleCcpPos,
-  handleCcpArch,
-  handleCcpOlPos,
-  handleCcpPkg,
-  handleCcpDev,
-  handleCcpAttrSel,
-  handleCcpAttrSelPrev,
-  handleCcpAttrSelNext,
-  handleCcpAttrPagePrev,
-  handleCcpAttrPageNext,
-  handleCcpAttrAdjust,
-  handleCcpSubmitAttrs,
-  handleCcpPreConfirm,
-  handleCcpConfirm,
-  handleCcpCancel,
-  handleCcpApplied,
-  handleCcpRefund,
-  handleCcpRefundModal,
-  handleCcpModal,
-  handleCcpHand,
-  handleCcpHeight,
-  handleCcpWeight,
-  handleCcpMotionStyle,
-  handleCcpQbDetailsModal,
-  handleCcpAppearanceModal,
-} from "../lib/custom-player-interactions.js";
-import { handleAcpPositionSelect, handleAcpPlayerSelect } from "../lib/acp-handlers.js";
-import { handleVcaNav, handleVcaAttrPageNav, handleViewArchetypeSelect } from "../lib/vca-handlers.js";
-import { handleTeamSelect, handlePositionSelect, handlePlayerSelect } from "../lib/vps-handlers.js";
 function computeIsSetupInteraction(interaction: Interaction): boolean {
   return (
     (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) &&
@@ -241,14 +84,9 @@ export async function execute(interaction: Interaction) {
   // itself handles the linked/unlinked branching — the unlinked hub is
   // specifically designed for users who have no role yet.
   const isMenuCommand    = interaction.isChatInputCommand() && interaction.commandName === "menu";
-  const isActionsInteraction = (
-    (interaction.isButton() || interaction.isStringSelectMenu()) &&
-    typeof (interaction as any).customId === "string" &&
-    (
-      (interaction as any).customId.startsWith("ac_") ||
-      (interaction as any).customId.startsWith("go_")
-    )
-  );
+  const isActionsInteraction = (interaction.isButton() || interaction.isStringSelectMenu())
+    && typeof (interaction as any).customId === "string"
+    && (interaction as any).customId.startsWith("ac_") || ("customId" in interaction && interaction.customId?.startsWith("go_")); 
 
   if (interaction.inGuild() && interaction.member && !isMenuCommand && !isActionsInteraction && !computeIsSetupInteraction(interaction)) {
     const roles = (interaction.member as any).roles;
@@ -374,22 +212,23 @@ async function handleButton(interaction: ButtonInteraction) {
   // ── League Operations / Commissioner Office intercept ─────────────────────
   // league-ops button intercept
   if (interaction.customId === "ac_commissioner_office" || interaction.customId === "ac_league_ops_back") {
-    await handleActionsInteraction(interaction);
-    return;
+    const handled = await handleActionsInteraction(interaction); return;
+    if (handled) return;
   }
 
   // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
-  if (action?.startsWith("ac_")) {
-    const handledDept = await handleMenuDepartmentInteraction(interaction as any);
-    if (handledDept) return;
-    await handleActionsInteraction(interaction);
-    return;
-  }
+  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
 
   // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
   if (action?.startsWith("ao_")) {
     const handled = await handleAdminOperationsInteraction(interaction);
     if (handled) return;
+  }
+
+  // ── Interview type picker (pre-game / post-game / general) ───────────────────
+  if (action === "interview_typepick") {
+    await handleInterviewTypePick(interaction);
+    return;
   }
 
   // ── Archetype viewer — archetype nav ─────────────────────────────────────────
@@ -845,6 +684,110 @@ async function handleButton(interaction: ButtonInteraction) {
 
 
   // ── Interview: approve ───────────────────────────────────────────────────────
+  if (action === "interview_approve") {
+    const interviewId = parseInt(secondPart ?? "0", 10);
+    await interaction.deferUpdate();
+
+    const rows = await db.select().from(interviewRequestsTable).where(eq(interviewRequestsTable.id, interviewId)).limit(1);
+    const interview = rows[0];
+    if (!interview) { await interaction.followUp({ content: "❌ Interview request not found.", ephemeral: true }); return; }
+    if (interview.status !== "pending") {
+      await interaction.followUp({ content: `⚠️ This interview has already been **${interview.status}**.`, ephemeral: true });
+      return;
+    }
+
+    const interviewPayout = await getPayoutValue(PAYOUT_KEYS.INTERVIEW_PAYOUT, interaction.guildId!);
+    await addBalance(interview.discordId, interviewPayout, interaction.guildId!);
+    await logTransaction(interview.discordId, interviewPayout, "addcoins", "Post-game interview payout", interaction.guildId!, interaction.user.id);
+    await db.update(interviewRequestsTable)
+      .set({ status: "approved", resolvedAt: new Date(), resolvedBy: interaction.user.id })
+      .where(eq(interviewRequestsTable.id, interviewId));
+
+    try {
+      const u = await interaction.client.users.fetch(interview.discordId);
+      await u.send(`🎙️ Your post-game interview was approved! **+${interviewPayout} coins** added to your balance.`).catch(() => {});
+    } catch (_) {}
+
+    const [ivUserRow] = await db.select({ team: usersTable.team })
+      .from(usersTable).where(eq(usersTable.discordId, interview.discordId)).limit(1);
+
+    const approvedEmbed = new EmbedBuilder()
+      .setColor(Colors.Green).setTitle("✅ Interview Approved")
+      .setDescription(
+        `**Player:** <@${interview.discordId}>${ivUserRow?.team ? ` (${ivUserRow.team})` : ""}\n` +
+        (interview.week ? `**Week:** ${interview.week}\n` : "") +
+        `**Coins Awarded:** +${interviewPayout} coins\n\n` +
+        `✅ Approved by ${interaction.user.toString()}`
+      )
+      .setFooter({ text: `Interview #${interviewId}` })
+      .setTimestamp();
+    await interaction.editReply({
+      embeds: [approvedEmbed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("interview_done").setLabel("✅ Approved").setStyle(ButtonStyle.Success).setDisabled(true),
+      )],
+    });
+
+    try {
+      const headlinesChannelId = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.HEADLINES);
+      const headlinesChannel = headlinesChannelId ? await interaction.client.channels.fetch(headlinesChannelId).catch(() => null) : null;
+      if (headlinesChannel?.isTextBased()) {
+        const interviewUser = await db.select({ team: usersTable.team }).from(usersTable)
+          .where(eq(usersTable.discordId, interview.discordId)).limit(1);
+        const teamName = interviewUser[0]?.team ?? null;
+
+        const interviewee = await interaction.client.users.fetch(interview.discordId).catch(() => null);
+
+        const headlinesEmbed = new EmbedBuilder()
+          .setColor(Colors.Blurple)
+          .setTitle("🎙️ Post-Game Interview")
+          .setDescription(
+            `**<@${interview.discordId}>**${teamName ? ` — ${teamName}` : ""}\n` +
+            `💰 **+${interviewPayout} coins** awarded.`
+          )
+          .addFields(
+            {
+              name: `❓ Q1: ${interview.question1 ?? ""}`,
+              value: interview.answer1 ?? "*No answer provided*",
+            },
+            {
+              name: `❓ Q2: ${interview.question2 ?? ""}`,
+              value: interview.answer2 ?? "*No answer provided*",
+            },
+            {
+              name: `❓ Q3: ${interview.question3 ?? ""}`,
+              value: interview.answer3 ?? "*No answer provided*",
+            },
+          )
+          .setFooter({ text: `Interview #${interviewId}${interview.week ? ` • ${interview.week}` : ""}` })
+          .setTimestamp();
+
+        if (interviewee) headlinesEmbed.setThumbnail(interviewee.displayAvatarURL());
+
+        await (headlinesChannel as TextChannel).send({ content: "@everyone", embeds: [headlinesEmbed] });
+      }
+    } catch (err) {
+      console.error("Failed to post interview approval to headlines channel:", err);
+    }
+
+    return;
+  }
+
+  // ── Interview: deny (open modal) ─────────────────────────────────────────────
+  if (action === "interview_deny") {
+    const interviewId = secondPart!;
+    const modal = new ModalBuilder().setCustomId(`interview_modal:${interviewId}`).setTitle("Deny Interview Request");
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder().setCustomId("reason").setLabel("Reason for denial")
+        .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500)
+        .setPlaceholder("Explain why this interview request is being denied..."),
+    ));
+    await interaction.showModal(modal).catch((err: Error) => {
+      if ((err as any).code !== 40060) console.error("showModal (deny) error:", err);
+    });
+    return;
+  }
+
   // ── Wager: opponent accepts ───────────────────────────────────────────────
   if (action === "wager_accept") {
     const wagerId = parseInt(secondPart ?? "0", 10);
@@ -1390,6 +1333,901 @@ async function handleButton(interaction: ButtonInteraction) {
   }
 
   // ── Interview: open answer modal (player-facing) ──────────────────────────
+  // Format: interview_answer:{targetUserId}:{i1,i2,i3}:{type}
+  if (action === "interview_answer") {
+    const targetUserId = secondPart!;          // parts[1]
+    const indicesStr   = parts[2]!;            // parts[2] = "i1,i2,i3"
+    const iType        = (parts[3] ?? "postgame") as InterviewType;
+
+    if (interaction.user.id !== targetUserId) {
+      await interaction.reply({ content: "❌ This interview form isn't yours to fill out.", ephemeral: true });
+      return;
+    }
+
+    const pool    = getQuestionPool(iType);
+    const indices = indicesStr.split(",").map(Number);
+    const q1 = (pool[indices[0]!] ?? INTERVIEW_QUESTIONS[indices[0]!])!;
+    const q2 = (pool[indices[1]!] ?? INTERVIEW_QUESTIONS[indices[1]!])!;
+    const q3 = (pool[indices[2]!] ?? INTERVIEW_QUESTIONS[indices[2]!])!;
+
+    const truncLabel = (q: string) => q.length <= 45 ? q : q.slice(0, 42) + "...";
+    const title      = interviewTypeLabel(iType);
+
+    const modal = new ModalBuilder()
+      .setCustomId(`interview_answer_modal:${indicesStr}:${iType}`)
+      .setTitle(`🎙️ ${title}`);
+
+    modal.addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("a1")
+          .setLabel(truncLabel(q1))
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setMinLength(10)
+          .setMaxLength(1000)
+          .setPlaceholder("Type your answer here..."),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("a2")
+          .setLabel(truncLabel(q2))
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setMinLength(10)
+          .setMaxLength(1000)
+          .setPlaceholder("Type your answer here..."),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("a3")
+          .setLabel(truncLabel(q3))
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setMinLength(10)
+          .setMaxLength(1000)
+          .setPlaceholder("Type your answer here..."),
+      ),
+    );
+
+    await interaction.showModal(modal).catch((err: Error) => {
+      if ((err as any).code !== 40060) console.error("showModal error:", err);
+    });
+    return;
+  }
+
+  // ── GOTW: admin confirms recommended game ─────────────────────────────────────
+  if (action === "gotw_confirm") {
+    // customId: gotw_confirm:{seasonId}:{weekIndex}:{awayDiscordId}:{homeDiscordId}
+    const [, rawSeasonId, rawWeekIndex, awayDiscordId, homeDiscordId] = interaction.customId.split(":");
+    const seasonId  = parseInt(rawSeasonId  ?? "0", 10);
+    const weekIndex = parseInt(rawWeekIndex ?? "0", 10);
+    const weekNum   = weekIndex + 1;
+
+    await interaction.deferUpdate();
+
+    // Look up team names for both Discord IDs — always scoped to THIS guild
+    const [awayUser] = await db.select({ team: usersTable.team })
+      .from(usersTable).where(and(eq(usersTable.discordId, awayDiscordId!), eq(usersTable.guildId, interaction.guildId!))).limit(1);
+    const [homeUser] = await db.select({ team: usersTable.team })
+      .from(usersTable).where(and(eq(usersTable.discordId, homeDiscordId!), eq(usersTable.guildId, interaction.guildId!))).limit(1);
+
+    const awayTeam = awayUser?.team ?? awayDiscordId ?? "Away Team";
+    const homeTeam = homeUser?.team ?? homeDiscordId ?? "Home Team";
+
+    const result = await postGotwToChannel(
+      interaction.client, seasonId, weekIndex, weekNum,
+      awayTeam, homeTeam, awayDiscordId!, homeDiscordId!, 0,
+      interaction.guildId!,
+    );
+
+    const gotwChanId = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.GOTW);
+    if (result) {
+      await interaction.editReply({
+        content: gotwChanId
+          ? `✅ GOTW posted to <#${gotwChanId}>!\n**${awayTeam} vs ${homeTeam}**`
+          : `✅ GOTW posted!\n**${awayTeam} vs ${homeTeam}**`,
+        components: [],
+      });
+    } else {
+      await interaction.editReply({
+        content: gotwChanId
+          ? `❌ Failed to post GOTW. Check that the bot has access to <#${gotwChanId}>.`
+          : `❌ Failed to post GOTW.`,
+        components: [],
+      });
+    }
+    return;
+  }
+
+  // ── GOTW: admin wants to pick a different game ────────────────────────────────
+  if (action === "gotw_decline") {
+    // customId: gotw_decline:{seasonId}:{weekIndex}
+    const [, rawSeasonId, rawWeekIndex] = interaction.customId.split(":");
+    const seasonId  = parseInt(rawSeasonId  ?? "0", 10);
+    const weekIndex = parseInt(rawWeekIndex ?? "0", 10);
+
+    await interaction.deferUpdate();
+
+    // Re-fetch the season and games
+    const [season] = await db.select()
+      .from(seasonsTable)
+      .where(eq(seasonsTable.id, seasonId))
+      .limit(1);
+
+    const games = season
+      ? await db.select()
+          .from(franchiseScheduleTable)
+          .where(and(
+            eq(franchiseScheduleTable.seasonId,  seasonId),
+            eq(franchiseScheduleTable.weekIndex, weekIndex),
+          ))
+      : [];
+
+    // Build team → Discord ID map using full MCA names (same logic as /weeklymatchups)
+    const teamToDiscord = await buildTeamToDiscord(interaction.guildId ?? undefined);
+
+    const scored = await scoreH2HMatchups(seasonId, weekIndex, games, teamToDiscord);
+
+    if (scored.length === 0) {
+      await interaction.editReply({
+        content: "❌ No H2H matchups available to select from.",
+        components: [],
+      });
+      return;
+    }
+
+    // Build select menu — one option per H2H game
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`gotw_select:${seasonId}:${weekIndex}`)
+      .setPlaceholder("Select the Game of the Week…")
+      .addOptions(
+        scored.map(g => {
+          const cooldownTag = g.eligible ? "" : " ⚠️ (cooldown)";
+          return new StringSelectMenuOptionBuilder()
+            .setLabel(`${g.awayTeamName} vs ${g.homeTeamName}${cooldownTag}`.slice(0, 100))
+            .setValue(`${g.awayDiscordId}:${g.homeDiscordId}`)
+            .setDescription(`${g.awayTeamName} vs ${g.homeTeamName}`.slice(0, 100));
+        })
+      );
+
+    const menuRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+
+    await interaction.editReply({
+      content: "Select the game you'd like to name as GOTW:",
+      components: [menuRow],
+    });
+    return;
+  }
+
+  // ── /initialize-server follow-up buttons ─────────────────────────────────────
+  if (action === "init_settings") {
+    await interaction.deferUpdate();
+    const settings = await getServerSettings(interaction.guildId!);
+    await interaction.followUp({
+      ephemeral: true,
+      content: "**⚙️ Server Feature Settings** — toggle any feature on or off:",
+      embeds:     [buildSettingsEmbed(settings)],
+      components: buildSettingsRows(settings),
+    });
+    return;
+  }
+
+  if (action === "init_teamguide") {
+    await interaction.deferUpdate();
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Blue)
+      .setTitle("👥 Team Linking Guide")
+      .setDescription(
+        "Link each Discord member to their NFL franchise. Repeat for every manager in your league.\n\n" +
+        "**Step 1 — Assign a team:**\n" +
+        "```/admin-linkteam set  user:@Member  team:Dallas Cowboys```\n" +
+        "Start typing the team name to autocomplete it.\n\n" +
+        "**Step 2 — Verify all assignments:**\n" +
+        "```/admin-linkteam view```\n" +
+        "Shows all linked managers and flags anyone still unlinked.\n\n" +
+        "**Step 3 — After importing EA data:**\n" +
+        "```/admin-linkteam relink```\n" +
+        "Re-cascades Discord IDs to roster rows — run this after each new MCA/EA import to make sure rosters and stats are attributed correctly.\n\n" +
+        "**Notes:**\n" +
+        "• CPU-controlled teams don't need a Discord link\n" +
+        "• Reassigning a team preserves the user's coin balance and records\n" +
+        "• If a manager leaves, use `/admin-clearteam` to free their slot",
+      )
+      .setFooter({ text: "Team Linking Guide • /initialize-server setup" });
+    await interaction.followUp({ ephemeral: true, embeds: [embed] });
+    return;
+  }
+
+  if (action === "init_ea") {
+    await interaction.deferUpdate();
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Blue)
+      .setTitle("🔗 Connect to EA — Franchise Data Import")
+      .setDescription(
+        "Choose one of two methods to feed your franchise data into the bot:\n\n" +
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+        "**Option A — EA Direct Connect (Recommended)**\n" +
+        "Automatically pulls rosters, schedules, and stats directly from EA with no MCA needed.\n\n" +
+        "**Step 1:** Get the EA login link:\n" +
+        "```/admin_ea_connect start```\n" +
+        "**Step 2:** Log in with the Commissioner's EA account. Copy the redirect URL from your browser.\n\n" +
+        "**Step 3:** Paste it back:\n" +
+        "```/admin_ea_connect code  redirect_url:<paste URL>```\n" +
+        "**Step 4:** If multiple leagues appear, pick yours:\n" +
+        "```/admin_ea_connect connect  league_id:<id>```\n" +
+        "**Step 5:** Pull data any time:\n" +
+        "```/admin_ea_export```\n\n" +
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+        "**Option B — MCA Webhook (Manual)**\n" +
+        "Use Madden Companion App → export your franchise data to a webhook URL.\n\n" +
+        "**Step 1:** Get your webhook URL:\n" +
+        "```/webhookurl```\n" +
+        "**Step 2:** In MCA, paste the URL and export league data after each week.",
+      )
+      .setFooter({ text: "EA Connect Guide • /initialize-server setup" });
+    await interaction.followUp({ ephemeral: true, embeds: [embed] });
+    return;
+  }
+
+  if (action === "init_payouts") {
+    await interaction.deferUpdate();
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Gold)
+      .setTitle("💰 Payout Configuration Guide")
+      .setDescription(
+        "Configure how coins are awarded at the end of each season.\n\n" +
+        "**Set EOS payout amounts:**\n" +
+        "```/admin-payout```\n" +
+        "Set values for: Champion, Runner-up, 3rd place, Playoff appearance, Regular season wins, etc.\n\n" +
+        "**Set stat-based XP tiers:**\n" +
+        "```/admin-set-stat-tiers```\n" +
+        "Define thresholds for QB/HB/WR/TE/DEF stats that earn bonus coins each week.\n\n" +
+        "**Preview what EOS payouts would look like right now:**\n" +
+        "```/admin-eos-testrun```\n" +
+        "Dry-run the payout calculation — nothing is actually paid out.\n\n" +
+        "**Run EOS payouts at season end:**\n" +
+        "```/endofseasonpayout```\n" +
+        "Distributes all coins based on standings, stats, and milestone tiers.\n\n" +
+        "**View current payout tier settings:**\n" +
+        "```/view-payout-tiers```",
+      )
+      .setFooter({ text: "Payout Guide • /initialize-server setup" });
+    await interaction.followUp({ ephemeral: true, embeds: [embed] });
+    return;
+  }
+
+  // ── Waitlist: accept / deny from DM ──────────────────────────────────────────
+  if (interaction.customId.startsWith(WAITLIST_ACCEPT_PREFIX) || interaction.customId.startsWith(WAITLIST_DENY_PREFIX)) {
+    const isAccept = interaction.customId.startsWith(WAITLIST_ACCEPT_PREFIX);
+    const targetGuildId = interaction.customId.slice(
+      isAccept ? WAITLIST_ACCEPT_PREFIX.length : WAITLIST_DENY_PREFIX.length,
+    );
+
+    await interaction.deferUpdate().catch(() => {});
+
+    const userId = interaction.user.id;
+
+    // Remove the user from the waitlist regardless of choice
+    await db
+      .delete(waitlistTable)
+      .where(and(eq(waitlistTable.guildId, targetGuildId), eq(waitlistTable.discordId, userId)));
+
+    if (isAccept) {
+      // Post in #welcome of the target guild tagging comms
+      try {
+        const guild       = interaction.client.guilds.cache.get(targetGuildId)
+                          ?? await interaction.client.guilds.fetch(targetGuildId).catch(() => null);
+        const welcomeId   = guild ? await getGuildChannel(targetGuildId, CHANNEL_KEYS.WELCOME).catch(() => null) : null;
+        const welcomeCh   = (welcomeId && guild)
+                          ? guild.channels.cache.get(welcomeId) ?? await interaction.client.channels.fetch(welcomeId).catch(() => null)
+                          : null;
+
+        if (welcomeCh?.isTextBased()) {
+          const commRole   = guild?.roles.cache.find(r => r.name === "Commissioner");
+          const coCommRole = guild?.roles.cache.find(r => r.name === "Co-Commissioner");
+          const rolePing   = [commRole, coCommRole].filter(Boolean).map(r => `<@&${r!.id}>`).join(" ");
+          await (welcomeCh as TextChannel).send({
+            content: [
+              `📣 ${rolePing ? `${rolePing} ` : ""}**<@${userId}> has accepted their waitlist invite and is ready to be assigned a team!**`,
+              "Please assign them a team using `/admin-linkteam set`.",
+            ].join("\n"),
+          });
+        }
+      } catch (err) {
+        console.error("[waitlist accept] Failed to post in welcome channel:", err);
+      }
+
+      await interaction.editReply({
+        content: "✅ **You've accepted the invite!** A commissioner will reach out shortly to assign your team. Welcome to the R.E.C. League!",
+        components: [],
+      }).catch(() => {});
+    } else {
+      await interaction.editReply({
+        content: "You've declined the invite and have been removed from the waitlist. If you change your mind, ask a commissioner to re-add you.",
+        components: [],
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  // ── Server settings: toggle feature flag ─────────────────────────────────────
+  if (action === "settings_toggle") {
+    const featureKey = secondPart as keyof typeof FEATURE_LABELS | undefined;
+    if (!featureKey) { await interaction.reply({ content: "❌ Unknown feature key.", ephemeral: true }); return; }
+
+    await interaction.deferUpdate();
+    const updated = await toggleFeature(featureKey as any, interaction.guildId!);
+    const label   = FEATURE_LABELS[featureKey as keyof typeof FEATURE_LABELS] ?? featureKey;
+    const state   = (updated as any)[featureKey] ? "✅ Enabled" : "❌ Disabled";
+
+    await interaction.editReply({
+      embeds:     [buildSettingsEmbed(updated)],
+      components: buildSettingsRows(updated),
+    });
+    await interaction.followUp({
+      content: `**${label}** toggled → ${state}\n⏳ Updating slash commands for this server…`,
+      ephemeral: true,
+    });
+
+    // Re-register commands for this guild so the command list reflects the new settings
+    if (interaction.guildId) {
+      registerCommandsForGuild(interaction.guildId).catch(err =>
+        console.error("[settings_toggle] Failed to re-register commands:", err),
+      );
+    }
+    return;
+  }
+
+  // ── Server settings: done ─────────────────────────────────────────────────────
+  if (action === "settings_done") {
+    await interaction.update({ components: [] });
+    return;
+  }
+
+  // ── Admin: seed default stat tiers for a season ───────────────────────────────
+  if (action === "seed_stat_defaults") {
+    const seasonId = parseInt(secondPart ?? "0", 10);
+    if (!seasonId) { await interaction.reply({ content: "❌ Invalid season ID.", ephemeral: true }); return; }
+
+    const adminCheck = await isAdminUser(interaction.user.id, interaction.guildId!).catch(() => false);
+    if (!adminCheck) {
+      await interaction.reply({ content: "❌ Only admins can seed stat tier defaults.", ephemeral: true });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    // Load existing tiers so we don't overwrite customized values
+    const existing = await db.select()
+      .from(seasonStatTierConfigsTable)
+      .where(eq(seasonStatTierConfigsTable.seasonId, seasonId));
+
+    const existingKeys = new Set(existing.map(r => `${r.statCategory}:${r.tier}`));
+
+    const toInsert: { seasonId: number; statCategory: string; tier: number; threshold: number; payout: number; updatedAt: Date }[] = [];
+
+    for (const cat of STAT_CATEGORIES) {
+      const defaults = STAT_TIER_DEFAULTS[cat.key];
+      if (!defaults) continue;
+      defaults.forEach((d, i) => {
+        const tier = i + 1;
+        const key = `${cat.key}:${tier}`;
+        if (!existingKeys.has(key)) {
+          toInsert.push({ seasonId, statCategory: cat.key, tier, threshold: d.threshold, payout: d.payout, updatedAt: new Date() });
+        }
+      });
+    }
+
+    if (toInsert.length === 0) {
+      await interaction.editReply({ content: "✅ All tiers are already configured — nothing to seed." });
+      return;
+    }
+
+    await db.insert(seasonStatTierConfigsTable).values(toInsert).onConflictDoNothing();
+
+    const seededCategories = [...new Set(toInsert.map(r => r.statCategory))];
+    const catLabels = seededCategories.map(key => {
+      const cat = STAT_CATEGORIES.find(c => c.key === key);
+      return cat ? `• **${cat.label}**` : `• ${key}`;
+    });
+
+    await interaction.editReply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🌱 Default Stat Tiers Seeded")
+          .setColor(Colors.Green)
+          .setDescription(
+            `Seeded **${toInsert.length} missing tiers** across **${seededCategories.length} categories** for Season ${seasonId}:\n\n` +
+            catLabels.join("\n"),
+          )
+          .setFooter({ text: "Existing custom tiers were not overwritten. Use /admin-set-stat-tier to adjust individual tiers." })
+          .setTimestamp(),
+      ],
+    });
+    return;
+  }
+
+  // ── EOS payout: commissioner approves ────────────────────────────────────────
+  if (action === "eos_approve") {
+    const payoutId  = parseInt(secondPart ?? "0", 10);
+    await interaction.deferUpdate();
+
+    const [payout] = await db.select().from(pendingEosPayoutsTable)
+      .where(eq(pendingEosPayoutsTable.id, payoutId)).limit(1);
+
+    if (!payout) { await interaction.followUp({ content: "❌ Payout not found.", ephemeral: true }); return; }
+    if (payout.status !== "pending") {
+      await interaction.followUp({ content: `⚠️ This payout has already been **${payout.status}**.`, ephemeral: true });
+      return;
+    }
+
+    // Always use payout.discordId from the DB — authoritative source of truth
+    // regardless of what Discord ID was embedded in the button customId.
+    const discordId = payout.discordId;
+
+    await addBalance(discordId, payout.totalCoins, interaction.guildId!);
+    await logTransaction(discordId, payout.totalCoins, "addcoins",
+      `EOS Season ${payout.seasonId} payout — approved by ${interaction.user.username}`,
+      interaction.guildId!, interaction.user.id);
+    await db.update(pendingEosPayoutsTable)
+      .set({ status: "approved", approvedBy: interaction.user.id, approvedAt: new Date() })
+      .where(eq(pendingEosPayoutsTable.id, payoutId));
+
+    type BreakdownItem = { label: string; statValue: number; unit: string; tier: number; coins: number };
+    const breakdown = (payout.statBreakdown ?? []) as BreakdownItem[];
+    const breakdownLines = breakdown.length > 0
+      ? breakdown.map(b => `• **${b.label}**: Tier ${b.tier} (+${b.coins.toLocaleString()} coins)`).join("\n")
+      : "*No qualifying stat tiers recorded.*";
+    const teamLabel = payout.teamName ? ` (${payout.teamName})` : "";
+
+    // ── Update commissioner embed to "Approved" ────────────────────────────────
+    const eosApprovedEmbed = new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle("✅ EOS Payout Approved")
+      .setDescription(
+        `**Team:** <@${discordId}>${teamLabel}\n` +
+        `**Season:** ${payout.seasonId}\n\n` +
+        `**Stat Breakdown:**\n${breakdownLines}\n\n` +
+        `**Total Awarded:** ${payout.totalCoins.toLocaleString()} coins\n\n` +
+        `✅ Approved by ${interaction.user.toString()}`,
+      )
+      .setFooter({ text: `EOS Payout #${payoutId} • Season ${payout.seasonId}` })
+      .setTimestamp();
+    await interaction.editReply({
+      embeds:     [eosApprovedEmbed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("eos_approved_done").setLabel("✅ Approved").setStyle(ButtonStyle.Success).setDisabled(true),
+      )],
+    });
+
+    // ── Post to public payouts channel ─────────────────────────────────────────
+    const PAYOUTS_CHANNEL_ID = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.PAYOUTS);
+    try {
+      const payoutsCh = PAYOUTS_CHANNEL_ID
+        ? await interaction.client.channels.fetch(PAYOUTS_CHANNEL_ID)
+        : null;
+      if (payoutsCh?.isTextBased()) {
+        const publicEmbed = new EmbedBuilder()
+          .setColor(Colors.Gold)
+          .setTitle("🏆 End-of-Season Payout")
+          .setDescription(
+            `<@${discordId}>${teamLabel}\n\n` +
+            `${breakdownLines}\n\n` +
+            `**Total Earned: +${payout.totalCoins.toLocaleString()} 🪙**`,
+          )
+          .setFooter({ text: `Season ${payout.seasonId} • EOS Payout` })
+          .setTimestamp();
+        await (payoutsCh as TextChannel).send({ embeds: [publicEmbed] });
+      }
+    } catch (err) {
+      console.error("[eos_approve] Failed to post to payouts channel:", err);
+    }
+
+    // ── DM the recipient with their full breakdown ──────────────────────────────
+    try {
+      const u = await interaction.client.users.fetch(discordId);
+      const dmEmbed = new EmbedBuilder()
+        .setColor(Colors.Gold)
+        .setTitle("🏆 End-of-Season Payout — Approved!")
+        .setDescription(
+          `Your Season ${payout.seasonId} payout has been approved!\n\n` +
+          `**Stat Breakdown:**\n${breakdownLines}\n\n` +
+          `**Total Added to Balance: +${payout.totalCoins.toLocaleString()} 🪙**`,
+        )
+        .setFooter({ text: "Coins have been added to your balance" })
+        .setTimestamp();
+      await u.send({ embeds: [dmEmbed] }).catch(() => {});
+    } catch (_) {}
+    return;
+  }
+
+  // ── EOS payout: commissioner edits amount ────────────────────────────────────
+  if (action === "eos_edit") {
+    const payoutId = secondPart!;
+    const modal = new ModalBuilder()
+      .setCustomId(`eos_edit_modal:${payoutId}`)
+      .setTitle("Edit EOS Payout Amount");
+    modal.addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("new_amount")
+          .setLabel("New coin amount to award")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setPlaceholder("e.g. 500"),
+      ),
+    );
+    await interaction.showModal(modal).catch((err: Error) => {
+      if ((err as any).code !== 40060) console.error("showModal (eos_edit) error:", err);
+    });
+    return;
+  }
+
+  // ── EOS payout: commissioner rejects / deletes a pending payout ─────────────
+  if (action === "eos_reject") {
+    const payoutId = parseInt(secondPart ?? "0", 10);
+    await interaction.deferUpdate();
+
+    const [payout] = await db.select().from(pendingEosPayoutsTable)
+      .where(eq(pendingEosPayoutsTable.id, payoutId)).limit(1);
+
+    if (!payout) { await interaction.followUp({ content: "❌ Payout not found.", ephemeral: true }); return; }
+    if (payout.status !== "pending") {
+      await interaction.followUp({ content: `⚠️ This payout has already been **${payout.status}** and can't be rejected.`, ephemeral: true });
+      return;
+    }
+
+    await db.update(pendingEosPayoutsTable)
+      .set({ status: "rejected", approvedBy: interaction.user.id, approvedAt: new Date() })
+      .where(eq(pendingEosPayoutsTable.id, payoutId));
+
+    const teamLabel = payout.teamName ? ` (${payout.teamName})` : "";
+    const rejectedEmbed = new EmbedBuilder()
+      .setColor(Colors.Red)
+      .setTitle("🗑️ EOS Payout Rejected")
+      .setDescription(
+        `**Team:** <@${payout.discordId}>${teamLabel}\n` +
+        `**Season:** ${payout.seasonId}\n\n` +
+        `❌ Rejected by ${interaction.user.toString()} — no coins awarded.`,
+      )
+      .setFooter({ text: `EOS Payout #${payoutId} • Season ${payout.seasonId}` })
+      .setTimestamp();
+
+    await interaction.editReply({
+      embeds:     [rejectedEmbed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("eos_rejected_done").setLabel("🗑️ Rejected").setStyle(ButtonStyle.Danger).setDisabled(true),
+      )],
+    });
+    return;
+  }
+
+  // ── GOTY: commissioner opens winner selection ─────────────────────────────────
+  if (action === "goty_select") {
+    const seasonId = parseInt(secondPart ?? "0", 10);
+    await interaction.deferReply({ ephemeral: true });
+
+    const allUsers = await db.select({ discordId: usersTable.discordId, team: usersTable.team })
+      .from(usersTable);
+    const teamsWithUsers = allUsers
+      .filter(u => u.team)
+      .sort((a, b) => (a.team ?? "").localeCompare(b.team ?? ""))
+      .slice(0, 25); // Discord select menu max 25
+
+    if (teamsWithUsers.length === 0) {
+      await interaction.editReply({ content: "❌ No users with teams found." });
+      return;
+    }
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`goty_winners:${seasonId}`)
+      .setPlaceholder("Select 1 or 2 GOTY winners...")
+      .setMinValues(1)
+      .setMaxValues(2)
+      .addOptions(teamsWithUsers.map(u =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(u.team!)
+          .setValue(u.discordId)
+      ));
+
+    await interaction.editReply({
+      content: "Select **1 or 2** GOTY winners. Each will receive coins + 1 free XF promotion.\n*(Select 1 if the other winner's team is now CPU-controlled.)*",
+      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)],
+    });
+    return;
+  }
+
+  // ── Violation: confirm ──────────────────────────────────────────────────────
+  if (action === "violation_confirm") {
+    const violationId = parseInt(secondPart ?? "0", 10);
+    await interaction.deferUpdate();
+
+    if (!(await isAdminUser(interaction.user.id, interaction.guildId!))) {
+      await interaction.followUp({ content: "❌ Only commissioners can confirm violations.", ephemeral: true });
+      return;
+    }
+
+    const [violation] = await db
+      .select()
+      .from(statPaddingViolationsTable)
+      .where(eq(statPaddingViolationsTable.id, violationId))
+      .limit(1);
+
+    if (!violation) {
+      await interaction.followUp({ content: `❌ Violation #${violationId} not found.`, ephemeral: true });
+      return;
+    }
+    if (violation.status !== "pending") {
+      await interaction.followUp({ content: `⚠️ Violation #${violationId} is already **${violation.status}**.`, ephemeral: true });
+      return;
+    }
+
+    // Mark confirmed
+    await db
+      .update(statPaddingViolationsTable)
+      .set({ status: "confirmed", resolvedAt: new Date(), resolvedBy: interaction.user.id })
+      .where(eq(statPaddingViolationsTable.id, violationId));
+
+    // ── Post to the violation log channel ──────────────────────────────────────
+    const violationLogEmbed = new EmbedBuilder()
+      .setColor(Colors.Red)
+      .setTitle("🚨 Violation Confirmed")
+      .setDescription(
+        violation.description +
+        (violation.discordId ? `\n\n**Owner:** <@${violation.discordId}>` : "") +
+        `\n\n✅ Confirmed by ${interaction.user.toString()}`,
+      )
+      .setFooter({ text: `Violation #${violationId} · ${violation.week} · Season ${violation.seasonId}` })
+      .setTimestamp();
+
+    try {
+      const violationLogChannelId = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.VIOLATION_LOG);
+      const vlChannel = violationLogChannelId ? await interaction.client.channels.fetch(violationLogChannelId).catch(() => null) : null;
+      if (vlChannel?.isTextBased()) {
+        await (vlChannel as TextChannel).send({ embeds: [violationLogEmbed] });
+      }
+    } catch (err) {
+      console.error("[violation_confirm] Failed to post to violation log:", err);
+    }
+
+    // ── Edit the commissioner message to show confirmed state ──────────────────
+    const confirmedEmbed = new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle("✅ Violation Confirmed")
+      .setDescription(
+        violation.description +
+        (violation.discordId ? `\n\n**Owner:** <@${violation.discordId}>` : "") +
+        `\n\n✅ Confirmed by ${interaction.user.toString()}\n📋 Posted to violation log`,
+      )
+      .setFooter({ text: `Violation #${violationId} · ${violation.week} · Season ${violation.seasonId}` })
+      .setTimestamp();
+
+    await interaction.editReply({
+      embeds: [confirmedEmbed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("violation_confirmed_done").setLabel("✅ Confirmed").setStyle(ButtonStyle.Success).setDisabled(true),
+      )],
+    });
+
+    // ── Check for repeat violations (2 confirmed = penalty notification) ───────
+    if (violation.discordId) {
+      const [{ value: confirmedCount }] = await db
+        .select({ value: count() })
+        .from(statPaddingViolationsTable)
+        .where(
+          and(
+            eq(statPaddingViolationsTable.discordId, violation.discordId),
+            eq(statPaddingViolationsTable.seasonId, violation.seasonId),
+            eq(statPaddingViolationsTable.status, "confirmed"),
+          ),
+        );
+
+      if (confirmedCount >= 2) {
+        const [userRow] = await db.select({ team: usersTable.team }).from(usersTable)
+          .where(eq(usersTable.discordId, violation.discordId)).limit(1);
+
+        const penaltyLines = [
+          `⚠️ **<@${violation.discordId}>${userRow?.team ? ` (${userRow.team})` : ""}** now has **${confirmedCount} confirmed violation(s)** this season.`,
+          ``,
+          `📋 **Action required:** Reduce the following player's OVR by **-15**:`,
+        ];
+        if (violation.playerName) {
+          penaltyLines.push(`> **${violation.playerName}** (${violation.teamName})`);
+        } else {
+          penaltyLines.push(`> Determine the player to penalize based on the violations above.`);
+        }
+        penaltyLines.push(
+          ``,
+          `Use the game settings or \`/admin\` tools to apply the OVR reduction.`,
+        );
+
+        const repeatViolCommChannelId = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.COMMISSIONER);
+        const commChannel = repeatViolCommChannelId ? await interaction.client.channels.fetch(repeatViolCommChannelId).catch(() => null) : null;
+
+        if (commChannel?.isTextBased()) {
+          const penaltyEmbed = new EmbedBuilder()
+            .setColor(Colors.Orange)
+            .setTitle("⚠️ Repeat Violation — OVR Penalty Required")
+            .setDescription(penaltyLines.join("\n"))
+            .setFooter({ text: `Triggered by Violation #${violationId} · Season ${violation.seasonId}` })
+            .setTimestamp();
+          await (commChannel as TextChannel).send({ embeds: [penaltyEmbed] });
+        }
+      }
+    }
+
+    return;
+  }
+
+  // ── Violation: deny ─────────────────────────────────────────────────────────
+  if (action === "violation_deny") {
+    const violationId = parseInt(secondPart ?? "0", 10);
+    await interaction.deferUpdate();
+
+    if (!(await isAdminUser(interaction.user.id, interaction.guildId!))) {
+      await interaction.followUp({ content: "❌ Only commissioners can deny violations.", ephemeral: true });
+      return;
+    }
+
+    const [violation] = await db
+      .select()
+      .from(statPaddingViolationsTable)
+      .where(eq(statPaddingViolationsTable.id, violationId))
+      .limit(1);
+
+    if (!violation) {
+      await interaction.followUp({ content: `❌ Violation #${violationId} not found.`, ephemeral: true });
+      return;
+    }
+    if (violation.status !== "pending") {
+      await interaction.followUp({ content: `⚠️ Violation #${violationId} is already **${violation.status}**.`, ephemeral: true });
+      return;
+    }
+
+    await db
+      .update(statPaddingViolationsTable)
+      .set({ status: "denied", resolvedAt: new Date(), resolvedBy: interaction.user.id })
+      .where(eq(statPaddingViolationsTable.id, violationId));
+
+    const deniedEmbed = new EmbedBuilder()
+      .setColor(Colors.Grey)
+      .setTitle("❌ Violation Denied")
+      .setDescription(
+        violation.description +
+        (violation.discordId ? `\n\n**Owner:** <@${violation.discordId}>` : "") +
+        `\n\n❌ Denied by ${interaction.user.toString()} — no action taken`,
+      )
+      .setFooter({ text: `Violation #${violationId} · ${violation.week} · Season ${violation.seasonId}` })
+      .setTimestamp();
+
+    await interaction.editReply({
+      embeds: [deniedEmbed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("violation_denied_done").setLabel("❌ Denied").setStyle(ButtonStyle.Danger).setDisabled(true),
+      )],
+    });
+
+    return;
+  }
+
+  // ── Admin-Payout Hub ──────────────────────────────────────────────────────────
+  if (action === "ap_cancel")             { await apHandleCancel(interaction);    return; }
+  if (action === "ap_gotw")              { await handleGotw(interaction);         return; }
+  if (action === "ap_gotw_finalize")     { await handleGotwFinalize(interaction); return; }
+  if (action === "ap_potw")              { await handlePotw(interaction);         return; }
+  if (action === "ap_potw_back")         { await handlePotwBack(interaction);      return; }
+  if (action === "ap_potw_finalize")     { await handlePotwFinalize(interaction);  return; }
+  if (action === "ap_close")             { await handleClose(interaction);         return; }
+  if (action === "ap_addcoins")          { await handleAddCoins(interaction);     return; }
+  if (action === "ap_addcoins_next")     { await handleAddCoinsNext(interaction); return; }
+  if (action === "ap_removecoins")       { await handleRemoveCoins(interaction);  return; }
+  if (action === "ap_removecoins_next")  { await handleRemoveCoinsNext(interaction); return; }
+  if (action === "ap_transfer")          { await handleTransfer(interaction);     return; }
+  if (action === "ap_transfer_next")     { await handleTransferNext(interaction); return; }
+  if (action === "ap_game")              { await handleGame(interaction);         return; }
+  if (action === "ap_game_winner_home")  { await handleGameWinnerHome(interaction); return; }
+  if (action === "ap_game_winner_away")  { await handleGameWinnerAway(interaction); return; }
+  if (action === "ap_game_winner_cpu")   { await handleGameWinnerCpu(interaction);  return; }
+  if (action === "ap_correct")           { await handleCorrect(interaction);      return; }
+  if (action === "ap_correct_new_winner"){ await handleCorrectNewWinner(interaction); return; }
+  if (action === "ap_correct_swap")      { await handleCorrectSwap(interaction);  return; }
+  if (action === "ap_setpay")            { await handleSetPay(interaction);          return; }
+  if (action === "ap_setpay_reg")        { await handleSetPayReg(interaction);       return; }
+  if (action === "ap_setpay_playoff")    { await handleSetPayPlayoff(interaction);   return; }
+  if (action === "ap_setpay_channel")    { await handleSetPayChannel(interaction);   return; }
+  if (action === "ap_setpay_po1_btn")   { await handleSetPayPo1Btn(interaction);   return; }
+  if (action === "ap_setpay_po2_btn")   { await handleSetPayPo2Btn(interaction);   return; }
+  if (action === "ap_newmember")         { await handleNewMember(interaction);    return; }
+  if (action === "ap_gotwbonus")         { await handleGotwBonus(interaction);    return; }
+  if (action === "ap_potwbonus")         { await handlePotwBonus(interaction);    return; }
+  if (action === "ap_referral")          { await handleReferral(interaction);     return; }
+  if (action === "ap_eos")              { await handleEos(interaction);          return; }
+  if (action === "ap_milestone")         { await handleMilestone(interaction);    return; }
+  if (action === "ap_ms_add")            { await handleMilestoneAdd(interaction);  return; }
+  if (action?.startsWith("ap_ms_edit_")) {
+    const tier = parseInt(action.slice("ap_ms_edit_".length), 10);
+    if (!isNaN(tier)) { await handleMilestoneEdit(interaction, tier); return; }
+  }
+  if (action === "ap_tweetpayout")       { await handleTweetPayout(interaction);      return; }
+  if (action === "ap_interviewpayout")   { await handleInterviewPayout(interaction);  return; }
+
+  // ── Admin User Data Hub ────────────────────────────────────────────────────
+  if (action === "ud_close")           { await handleUdClose(interaction);          return; }
+  if (action === "ud_cancel")          { await handleUdCancel(interaction);         return; }
+  if (action === "ud_view_teams")      { await handleUdViewTeams(interaction);      return; }
+  if (action === "ud_link")            { await handleUdLink(interaction);           return; }
+  if (action === "ud_link_next")       { await handleUdLinkNext(interaction);       return; }
+  if (action === "ud_unlink")          { await handleUdUnlink(interaction);         return; }
+  if (action === "ud_unlink_confirm")  { await handleUdUnlinkConfirm(interaction);  return; }
+  if (action === "ud_view_edit")       { await handleUdViewEdit(interaction);       return; }
+  if (action === "ud_ve_load")         { await handleUdVeLoad(interaction);         return; }
+  if (action === "ud_edit_economy")    { await handleUdEditEconomy(interaction);    return; }
+  if (action === "ud_edit_records")    { await handleUdEditRecords(interaction);    return; }
+  if (action === "ud_edit_alltime")    { await handleUdEditAllTime(interaction);    return; }
+  if (action === "ud_delete")          { await handleUdDelete(interaction);         return; }
+  if (action === "ud_delete_confirm")  { await handleUdDeleteConfirm(interaction);  return; }
+  if (action === "ud_delete_toggle") {
+    const category = parts[1] ?? "";
+    await handleUdDeleteToggle(interaction, category);
+    return;
+  }
+
+  // ── Admin Store Settings Hub ───────────────────────────────────────────────
+  if (action === "ss_close")          { await handleSsClose(interaction);          return; }
+  if (action === "ss_cancel")         { await handleSsCancel(interaction);         return; }
+  if (action === "ss_arch")           { await handleSsArch(interaction);           return; }
+  if (action === "ss_arch_prev")      { await handleSsArchPrev(interaction);       return; }
+  if (action === "ss_arch_next")      { await handleSsArchNext(interaction);       return; }
+  if (action === "ss_arch_edit")      { await handleSsArchEdit(interaction);       return; }
+  if (action === "ss_arch_back_to_view") { await handleSsArchBackToView(interaction); return; }
+  if (action === "ss_lt")             { await handleSsLt(interaction);             return; }
+  if (action === "ss_lt_edit")        { await handleSsLtEdit(interaction);         return; }
+  if (action === "ss_lt_create")      { await handleSsLtCreate(interaction);       return; }
+  if (action === "ss_lt_back_to_pos") { await handleSsLtBackToPos(interaction);   return; }
+  if (action === "ss_lt_back_to_model") { await handleSsLtBackToModel(interaction); return; }
+  if (action === "ss_lt_back_to_view")  { await handleSsLtBackToView(interaction);  return; }
+}
+
+// ── String select menu handler ─────────────────────────────────────────────────
+async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
+  if (isNewServerSetupCustomId(interaction.customId)) {
+    const handled = await handleNewServerSetupInteraction(interaction);
+    if (handled) return;
+  }
+
+  // ── League Operations selector intercept ─────────────────────────────────
+  // league-ops select intercept
+  if (interaction.customId === "ac_office_select" && interaction.values?.[0] === "league_operations") {
+    const handled = await handleActionsInteraction(interaction); return;
+    if (handled) return;
+  }
+
+  const parts     = interaction.customId.split(":");
+  const action    = parts[0]!;
+  const sessionId = parts[1] ?? "";
+
+  // ── League Data wizard — all ld_ prefixed select menus ───────────────────────
+  if (action?.startsWith("ld_")) {
+    await handleLeagueDataSelect(interaction);
+    return;
+  }
+
+  // ── Admin troubleshoot — schedule select menu ─────────────────────────────────
+  if (action === "ts_sched_sel") {
+    await handleTsSchedSel(interaction);
+    return;
+  }
+
+  // ── Actions hub — dispatch all ac_ prefixed interactions ─────────────────────
+  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
+
+  // ── Admin Operations hub — dispatch all ao_ prefixed interactions ─────────────
+  if (action?.startsWith("ao_")) {
+    const handled = await handleAdminOperationsInteraction(interaction);
+    if (handled) return;
+  }
+
   // ── Archetype viewer ──────────────────────────────────────────────────────────
   if (action === "vca_pos") { await handleViewArchetypeSelect(interaction); return; }
 
@@ -1733,12 +2571,7 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   }
 
   // ── Actions hub — dispatch all ac_ prefixed modal submissions ─────────────────
-  if (action?.startsWith("ac_")) {
-    const handledDept = await handleMenuDepartmentInteraction(interaction as any);
-    if (handledDept) return;
-    await handleActionsInteraction(interaction);
-    return;
-  }
+  if (action?.startsWith("ac_")) await handleActionsInteraction(interaction); return;
 
   // ── Admin Operations hub — dispatch all ao_ prefixed modal submissions ─────────
   if (action?.startsWith("ao_")) {
@@ -1759,8 +2592,156 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   if (action === "ccp_appearance_modal") { await handleCcpAppearanceModal(interaction, idStr ?? "");  return; }
 
   // ── Interview denial ─────────────────────────────────────────────────────────
+  if (action === "interview_modal") {
+    const interviewId = parseInt(idStr!, 10);
+    const reason      = interaction.fields.getTextInputValue("reason");
+
+    const rows = await db.select().from(interviewRequestsTable).where(eq(interviewRequestsTable.id, interviewId)).limit(1);
+    const interview = rows[0];
+    if (!interview) { await interaction.reply({ content: "❌ Interview not found.", ephemeral: true }); return; }
+    if (interview.status !== "pending") {
+      await interaction.reply({ content: `⚠️ This interview has already been **${interview.status}**.`, ephemeral: true });
+      return;
+    }
+
+    await db.update(interviewRequestsTable)
+      .set({ status: "denied", denialReason: reason, resolvedAt: new Date(), resolvedBy: interaction.user.id })
+      .where(eq(interviewRequestsTable.id, interviewId));
+
+    try {
+      const u = await interaction.client.users.fetch(interview.discordId);
+      await u.send(`❌ **Your post-game interview request was denied.**\n**Reason:** ${reason}\n\nYour interview slot has been reset — you may submit another interview after your next game.`).catch(() => {});
+    } catch (_) {}
+
+    try {
+      const interviewDenialCommChannelId = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.COMMISSIONER);
+      const commChannel = interviewDenialCommChannelId ? await interaction.client.channels.fetch(interviewDenialCommChannelId).catch(() => null) : null;
+      if (commChannel?.isTextBased() && interview.discordMessageId) {
+        const msg = await (commChannel as any).messages.fetch(interview.discordMessageId);
+        const deniedEmbed = new EmbedBuilder()
+          .setColor(Colors.Red).setTitle("❌ Interview Denied")
+          .setDescription(`**Denied by:** ${interaction.user.toString()}\n**Reason:** ${reason}`)
+          .setTimestamp();
+        await msg.edit({
+          embeds: [deniedEmbed],
+          components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder().setCustomId("interview_denied_done").setLabel("❌ Denied").setStyle(ButtonStyle.Danger).setDisabled(true),
+          )],
+        });
+      }
+    } catch (err) { console.error("Failed to edit commissioner message after interview denial:", err); }
+
+    await interaction.reply({ content: `✅ Interview **#${interviewId}** denied. The player has been notified and their slot has been reset.`, ephemeral: true });
+    return;
+  }
 
   // ── Interview: submit answers (player-facing modal) ───────────────────────
+  if (action === "interview_answer_modal") {
+    // Format: interview_answer_modal:i1,i2,i3:type
+    const indicesStr = idStr!;
+    const iType      = (parts[2] ?? "postgame") as InterviewType;
+    const pool       = getQuestionPool(iType);
+    const indices    = indicesStr.split(",").map(Number);
+    const q1 = (pool[indices[0]!] ?? INTERVIEW_QUESTIONS[indices[0]!])!;
+    const q2 = (pool[indices[1]!] ?? INTERVIEW_QUESTIONS[indices[1]!])!;
+    const q3 = (pool[indices[2]!] ?? INTERVIEW_QUESTIONS[indices[2]!])!;
+    const a1 = interaction.fields.getTextInputValue("a1");
+    const a2 = interaction.fields.getTextInputValue("a2");
+    const a3 = interaction.fields.getTextInputValue("a3");
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const requester     = await getOrCreateUser(interaction.user.id, interaction.user.username, interaction.guildId!);
+    const requesterTeam = requester.team ?? interaction.user.username;
+    const season        = await getOrCreateActiveSeason(interaction.guildId!);
+    const currentWeek   = (season as any).currentWeek ?? "1";
+    const weekDisplay   = weekLabel(currentWeek);
+    const commChannelId = await getGuildChannel(interaction.guildId!, CHANNEL_KEYS.COMMISSIONER);
+
+    // Re-check: only one interview per week
+    const existingInterview = await db.select({ id: interviewRequestsTable.id, status: interviewRequestsTable.status })
+      .from(interviewRequestsTable)
+      .where(and(
+        eq(interviewRequestsTable.discordId, interaction.user.id),
+        eq(interviewRequestsTable.guildId,   interaction.guildId!),
+        eq(interviewRequestsTable.week, currentWeek),
+        inArray(interviewRequestsTable.status, ["pending", "approved"]),
+      ))
+      .limit(1);
+
+    if (existingInterview.length > 0) {
+      const dupe = existingInterview[0]!;
+      await interaction.editReply({
+        content: `⚠️ You already have an interview for ${weekDisplay} (Interview #\`${dupe.id}\`, status: **${dupe.status}**). Only one per week.`,
+      });
+      return;
+    }
+
+    // Create the interview record with questions + answers
+    const [interview] = await db.insert(interviewRequestsTable).values({
+      discordId: interaction.user.id,
+      guildId:   interaction.guildId!,
+      week:      currentWeek,
+      status:    "pending",
+      question1: q1,
+      question2: q2,
+      question3: q3,
+      answer1:   a1,
+      answer2:   a2,
+      answer3:   a3,
+    }).returning();
+
+    const interviewId = interview!.id;
+
+    // ── Commissioner embed with all 3 Q&A pairs ──────────────────────────────
+    const submitPayoutVal = await getPayoutValue(PAYOUT_KEYS.INTERVIEW_PAYOUT, interaction.guildId!);
+    const typeLabel = interviewTypeLabel(iType);
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Blurple)
+      .setTitle(`🎙️ ${typeLabel}`)
+      .addFields(
+        { name: "Player", value: `${interaction.user.toString()} (${requesterTeam})`, inline: true },
+        { name: "Week",   value: weekDisplay, inline: true },
+        { name: `Q1: ${q1.slice(0, 200)}`, value: a1.slice(0, 1000) },
+        { name: `Q2: ${q2.slice(0, 200)}`, value: a2.slice(0, 1000) },
+        { name: `Q3: ${q3.slice(0, 200)}`, value: a3.slice(0, 1000) },
+        { name: "Payout if Approved", value: `+**${submitPayoutVal} coins**` },
+      )
+      .setFooter({ text: `Interview #${interviewId}` })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`interview_approve:${interviewId}`)
+        .setLabel("✅ Approve Interview")
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`interview_deny:${interviewId}`)
+        .setLabel("❌ Deny")
+        .setStyle(ButtonStyle.Danger),
+    );
+
+    try {
+      const channel = await interaction.client.channels.fetch(commChannelId);
+      if (channel?.isTextBased()) {
+        const msg = await (channel as any).send({ embeds: [embed], components: [row] });
+        await db.update(interviewRequestsTable)
+          .set({ discordMessageId: msg.id })
+          .where(eq(interviewRequestsTable.id, interviewId));
+      }
+    } catch (err) {
+      console.error("Failed to post interview to commissioner channel:", err);
+    }
+
+    await interaction.editReply({
+      content: [
+        `✅ **Interview submitted for ${weekDisplay}!** (Interview #\`${interviewId}\`)`,
+        `Your answers have been sent to the commissioner for review.`,
+        `You'll get a DM once it's approved or denied.`,
+      ].join("\n"),
+    });
+    return;
+  }
 
   // ── EOS payout: edit amount submitted ────────────────────────────────────────
   if (action === "eos_edit_modal") {
@@ -1836,6 +2817,8 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   if (action === "ap_modal_newmember")      { await handleNewMemberModal(interaction);     return; }
   if (action === "ap_modal_gotwbonus")        { await handleGotwBonusModal(interaction);       return; }
   if (action === "ap_modal_potwbonus")        { await handlePotwBonusModal(interaction);       return; }
+  if (action === "ap_modal_tweetpayout")      { await handleTweetPayoutModal(interaction);     return; }
+  if (action === "ap_modal_interviewpayout")  { await handleInterviewPayoutModal(interaction); return; }
   if (action === "ap_modal_eos_edit")       { await handleEosEditModal(interaction);        return; }
   if (action === "ap_modal_eos_stat_tier")  { await handleEosStatTierModal(interaction);    return; }
   if (action === "ap_modal_milestone_edit") { await handleMilestoneEditModal(interaction);  return; }

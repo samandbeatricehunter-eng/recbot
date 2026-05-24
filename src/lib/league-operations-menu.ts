@@ -11,7 +11,7 @@ import {
 import { isAdminUser, getOrCreateActiveSeason } from "./db-helpers.js";
 import { weekLabel } from "./week-helpers.js";
 import { buildAdminOpsEmbed, buildAdminOpsRows } from "../commands/admin-operations.js";
-import { buildActionsHubEmbed, buildActionsHubRows } from "../commands/actions.js";
+import { buildActionsHubEmbed, buildActionsHubRows } from "../lib/actions-hub-embeds.js";
 import { getServerSettings } from "./server-settings.js";
 import { getOrCreateUser } from "./db-helpers.js";
 

@@ -1,4 +1,8 @@
-import { handleStreamPost, handleHighlightPost } from "../lib/stream-monitor.js";
+/**
+ * stream-monitor.ts
+ * Handles #stream and #highlights channel post detection and coin payout requests.
+ * Extracted from events/messageCreate.ts.
+ */
 import { Events, Message, EmbedBuilder, Colors, ActionRowBuilder, ButtonBuilder, ButtonStyle, TextChannel, GuildMember } from "discord.js";
 import { executeAdminAction, type AdminAction, type AdminActionContext } from "../lib/admin-actions.js";
 import { pendingCoCommActions, purgeExpiredCoCommActions, type PendingCoCommAction } from "../lib/pending-cocomm-actions.js";
@@ -1180,8 +1184,242 @@ ${isCoCommissioner
 If the commissioner is NOT giving an admin action order (just chatting), use the normal type tags as usual — do NOT use ADMIN_DISPATCH for casual conversation.` : ""}`;
 }
 
+// ── Channel-based payout monitors ─────────────────────────────────────────────
 
-// Stream + highlight monitors — see lib/stream-monitor.ts
+// Matches any twitch.tv URL (including clips.twitch.tv, www.twitch.tv, etc.)
+const TWITCH_URL_RE         = /https?:\/\/(?:[\w-]+\.)?twitch\.tv\/\S+/i;
+
+async function handleStreamPost(message: Message): Promise<void> {
+  if (!TWITCH_URL_RE.test(message.content)) return;
+
+  const commChannelId = await getGuildChannel(message.guildId ?? PRIMARY_GUILD_ID, CHANNEL_KEYS.COMMISSIONER);
+  if (!commChannelId) { console.error("Commissioner channel not configured"); return; }
+
+  // Fetch commissioner channel FIRST — if unreachable, fail before touching the DB
+  const commChannel = await message.client.channels.fetch(commChannelId).catch(() => null);
+  if (!commChannel?.isTextBased()) {
+    console.error(`[handleStreamPost] Cannot reach commissioner channel ${commChannelId} — skipping stream payout for ${message.author.id}`);
+    return;
+  }
+
+  try {
+    const season       = await getOrCreateActiveSeason(message.guildId!);
+    const currentWeek  = (season as any).currentWeek ?? "1";
+    const streamPayout = await getPayoutValue(PAYOUT_KEYS.STREAM_PAYOUT);
+
+    // Duplicate guard — one stream payout per user per week.
+    // We allow a re-try if there's a pending record with no commMessageId,
+    // which means a previous attempt created the DB row but crashed before
+    // the commissioner message was ever sent. In that case, delete the orphan
+    // and continue so we post a fresh commissioner approval request.
+    const [existing] = await db
+      .select({ id: pendingChannelPayoutsTable.id, commMessageId: pendingChannelPayoutsTable.commMessageId })
+      .from(pendingChannelPayoutsTable)
+      .where(and(
+        eq(pendingChannelPayoutsTable.type, "stream"),
+        eq(pendingChannelPayoutsTable.discordId, message.author.id),
+        eq(pendingChannelPayoutsTable.seasonId, season.id),
+        eq(pendingChannelPayoutsTable.week, currentWeek),
+        inArray(pendingChannelPayoutsTable.status, ["pending", "approved"]),
+      ))
+      .limit(1);
+
+    if (existing) {
+      if (existing.commMessageId) return; // commissioner message already sent (pending review or approved)
+      // Orphaned pending record — commMessage was never sent (e.g. bot crashed mid-handler).
+      // Delete it so we can re-try sending the commissioner approval message.
+      await db.delete(pendingChannelPayoutsTable).where(eq(pendingChannelPayoutsTable.id, existing.id));
+    }
+
+    // Look up the streamer's team (for display in embed)
+    const [userRow] = await db
+      .select({ team: usersTable.team })
+      .from(usersTable)
+      .where(eq(usersTable.discordId, message.author.id))
+      .limit(1);
+
+    const streamerTeam = userRow?.team ?? null;
+
+    const twitchMatch = message.content.match(TWITCH_URL_RE);
+    const twitchUrl   = twitchMatch ? twitchMatch[0] : "(link)";
+
+    // Stream payout: only the user who posts the stream gets paid (15 coins).
+    // Opponent is NOT paid regardless of whether this is H2H or a CPU game.
+    const payoutDesc = `+${streamPayout} coins → <@${message.author.id}>`;
+
+    // Insert pending payout record (without commMessageId yet)
+    const [inserted] = await db
+      .insert(pendingChannelPayoutsTable)
+      .values({
+        type:      "stream",
+        discordId: message.author.id,
+        amount:    streamPayout,
+        channelId: message.channelId,
+        messageId: message.id,
+        guildId:   message.guildId!,
+        seasonId:  season.id,
+        week:      currentWeek,
+      })
+      .returning({ id: pendingChannelPayoutsTable.id });
+
+    const payoutId = inserted?.id;
+    if (!payoutId) return;
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Purple)
+      .setTitle("🎮 Stream Payout — Approval Required")
+      .setDescription(
+        `<@${message.author.id}>${streamerTeam ? ` (${streamerTeam})` : ""} posted a Twitch stream this week.\n\n` +
+        `**Stream:** ${twitchUrl}\n\n` +
+        `**Payout:**\n${payoutDesc}`
+      )
+      .setFooter({ text: `Payout #${payoutId} • Week ${currentWeek}` })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`stream_approve:${payoutId}`)
+        .setLabel("✅ Approve & Pay Out")
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`stream_deny:${payoutId}`)
+        .setLabel("❌ Deny")
+        .setStyle(ButtonStyle.Danger),
+    );
+
+    const commMsg = await (commChannel as TextChannel).send({ embeds: [embed], components: [row] });
+
+    // Store the commissioner log message ID so we can update it on approval/denial
+    await db
+      .update(pendingChannelPayoutsTable)
+      .set({ commMessageId: commMsg.id })
+      .where(eq(pendingChannelPayoutsTable.id, payoutId));
+
+  } catch (err) {
+    console.error("handleStreamPost error:", err);
+  }
+}
+
+async function handleHighlightPost(message: Message): Promise<void> {
+  // Must have at least one video attachment
+  const videoAttachments = [...message.attachments.values()].filter(
+    a => a.contentType?.startsWith("video/"),
+  );
+  if (videoAttachments.length === 0) return;
+
+  const commChannelId = await getGuildChannel(message.guildId ?? PRIMARY_GUILD_ID, CHANNEL_KEYS.COMMISSIONER);
+  if (!commChannelId) { console.error("Commissioner channel not configured"); return; }
+
+  // Fetch commissioner channel FIRST — if unreachable, fail before touching the DB
+  const commChannel = await message.client.channels.fetch(commChannelId).catch(() => null);
+  if (!commChannel?.isTextBased()) {
+    console.error(`[handleHighlightPost] Cannot reach commissioner channel ${commChannelId} — skipping highlight payout for ${message.author.id}`);
+    return;
+  }
+
+  try {
+    const season          = await getOrCreateActiveSeason(message.guildId!);
+    const currentWeek     = (season as any).currentWeek ?? "1";
+    const isPlayoffWeek   = PLAYOFF_WEEKS_SET.has(currentWeek);
+    const highlightLimit  = await getPayoutValue(PAYOUT_KEYS.HIGHLIGHT_LIMIT);
+    const highlightPayout = await getPayoutValue(
+      isPlayoffWeek ? PAYOUT_KEYS.HIGHLIGHT_PLAYOFF_PAYOUT : PAYOUT_KEYS.HIGHLIGHT_PAYOUT,
+    );
+
+    // Count payouts for this user this week where the commissioner message was actually sent.
+    // Orphaned pending records (no commMessageId) are excluded so a re-post can recover them.
+    const [countRow] = await db
+      .select({ total: count() })
+      .from(pendingChannelPayoutsTable)
+      .where(and(
+        eq(pendingChannelPayoutsTable.type, "highlight"),
+        eq(pendingChannelPayoutsTable.discordId, message.author.id),
+        eq(pendingChannelPayoutsTable.seasonId, season.id),
+        eq(pendingChannelPayoutsTable.week, currentWeek),
+        inArray(pendingChannelPayoutsTable.status, ["pending", "approved"]),
+        isNotNull(pendingChannelPayoutsTable.commMessageId),
+      ));
+
+    const usedSlots = Number(countRow?.total ?? 0);
+    if (usedSlots >= highlightLimit) return; // max reached — silently ignore
+
+    // Delete any orphaned pending records (no commMessageId) to make room for fresh attempts
+    await db.delete(pendingChannelPayoutsTable).where(and(
+      eq(pendingChannelPayoutsTable.type, "highlight"),
+      eq(pendingChannelPayoutsTable.discordId, message.author.id),
+      eq(pendingChannelPayoutsTable.seasonId, season.id),
+      eq(pendingChannelPayoutsTable.week, currentWeek),
+      eq(pendingChannelPayoutsTable.status, "pending"),
+      sql`${pendingChannelPayoutsTable.commMessageId} IS NULL`,
+    ));
+
+    // Each video in this message is a separate payout request (up to the weekly cap)
+    const [userRow] = await db
+      .select({ team: usersTable.team })
+      .from(usersTable)
+      .where(eq(usersTable.discordId, message.author.id))
+      .limit(1);
+
+    const posterTeam = userRow?.team ?? null;
+
+    let slotsToCreate = Math.min(videoAttachments.length, highlightLimit - usedSlots);
+
+    for (let i = 0; i < slotsToCreate; i++) {
+      const videoNum = usedSlots + i + 1; // 1-indexed
+
+      const [inserted] = await db
+        .insert(pendingChannelPayoutsTable)
+        .values({
+          type:      "highlight",
+          discordId: message.author.id,
+          amount:    highlightPayout,
+          channelId: message.channelId,
+          messageId: message.id,
+          guildId:   message.guildId!,
+          seasonId:  season.id,
+          week:      currentWeek,
+        })
+        .returning({ id: pendingChannelPayoutsTable.id });
+
+      const payoutId = inserted?.id;
+      if (!payoutId) continue;
+
+      const seasonLabel = isPlayoffWeek ? " 🏆 Postseason" : "";
+      const embed = new EmbedBuilder()
+        .setColor(isPlayoffWeek ? Colors.Gold : Colors.Orange)
+        .setTitle(`🎬 Highlight Payout${seasonLabel} — Approval Required`)
+        .setDescription(
+          `<@${message.author.id}>${posterTeam ? ` (${posterTeam})` : ""} posted a highlight video.\n\n` +
+          `**Video:** #${videoNum} this week (${highlightLimit} max paid per week)\n` +
+          `**Payout:** +${highlightPayout} coins → <@${message.author.id}>`
+        )
+        .setFooter({ text: `Payout #${payoutId} • Week ${currentWeek}` })
+        .setTimestamp();
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`highlight_approve:${payoutId}`)
+          .setLabel("✅ Approve & Pay Out")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`highlight_deny:${payoutId}`)
+          .setLabel("❌ Deny")
+          .setStyle(ButtonStyle.Danger),
+      );
+
+      const commMsg = await (commChannel as TextChannel).send({ embeds: [embed], components: [row] });
+
+      await db
+        .update(pendingChannelPayoutsTable)
+        .set({ commMessageId: commMsg.id })
+        .where(eq(pendingChannelPayoutsTable.id, payoutId));
+    }
+
+  } catch (err) {
+    console.error("handleHighlightPost error:", err);
+  }
+}
+
 // ── Commissioner role helpers ──────────────────────────────────────────────────
 
 function hasFullCommissionerRole(member: GuildMember | null): boolean {
@@ -1216,288 +1454,241 @@ function buildActionSummary(action: AdminAction): string {
 
 // ── Event export ───────────────────────────────────────────────────────────────
 
-export const name  = Events.MessageCreate;
-export const once  = false;
 
-export async function execute(message: Message): Promise<void> {
-  if (!message.guild) return;
-  if (message.author.bot) return;
+export // ── Channel-based payout monitors ─────────────────────────────────────────────
 
-  // ── Channel-based payout monitors (run before @mention guard) ─────────────
-  // Channel IDs are resolved per-guild from guildChannelsTable so both servers
-  // post to their own configured #stream and #highlights channels.
-  {
-    const guildId = message.guildId ?? PRIMARY_GUILD_ID;
-    const [streamCh, highlightsCh] = await Promise.all([
-      getGuildChannel(guildId, CHANNEL_KEYS.STREAM).catch(() => null),
-      getGuildChannel(guildId, CHANNEL_KEYS.HIGHLIGHTS).catch(() => null),
-    ]);
-    if (streamCh && message.channelId === streamCh) {
-      await handleStreamPost(message);
-      return;
-    }
-    if (highlightsCh && message.channelId === highlightsCh) {
-      await handleHighlightPost(message);
-      return;
-    }
-  }
+// Matches any twitch.tv URL (including clips.twitch.tv, www.twitch.tv, etc.)
+const TWITCH_URL_RE         = /https?:\/\/(?:[\w-]+\.)?twitch\.tv\/\S+/i;
 
-  // Only respond to @mentions from here on
-  if (!message.mentions.has(message.client.user!, { ignoreEveryone: true })) return;
+async function handleStreamPost(message: Message): Promise<void> {
+  if (!TWITCH_URL_RE.test(message.content)) return;
 
-  // Identify other users mentioned in the message (not the bot itself)
-  const otherMentioned = [...message.mentions.users.values()].filter(
-    u => u.id !== message.client.user!.id && u.id !== message.author.id,
-  );
+  const commChannelId = await getGuildChannel(message.guildId ?? PRIMARY_GUILD_ID, CHANNEL_KEYS.COMMISSIONER);
+  if (!commChannelId) { console.error("Commissioner channel not configured"); return; }
 
-  // Replace each non-bot mention with the user's display name so the content reads naturally
-  let content = message.content;
-  // Strip the bot's own mention
-  content = content.replace(new RegExp(`<@!?${message.client.user!.id}>`, "g"), "");
-  // Replace other user mentions with their server display name
-  for (const u of otherMentioned) {
-    const member = message.mentions.members?.get(u.id) ?? message.guild?.members.cache.get(u.id);
-    const displayName = member?.displayName ?? u.username;
-    content = content.replace(new RegExp(`<@!?${u.id}>`, "g"), displayName);
-  }
-  content = content.trim();
-
-  // Empty mention — prompt them to ask something
-  if (!content) {
-    await message.reply("Yeah? What do you need?").catch(() => {});
+  // Fetch commissioner channel FIRST — if unreachable, fail before touching the DB
+  const commChannel = await message.client.channels.fetch(commChannelId).catch(() => null);
+  if (!commChannel?.isTextBased()) {
+    console.error(`[handleStreamPost] Cannot reach commissioner channel ${commChannelId} — skipping stream payout for ${message.author.id}`);
     return;
   }
 
-  // Show typing while we work (guild text channels support this)
-  if ("sendTyping" in message.channel) {
-    await (message.channel as any).sendTyping().catch(() => {});
-  }
-
-  // ── Commissioner role check ─────────────────────────────────────────────────
-  const isFullCommissioner = hasFullCommissionerRole(message.member);
-  const isCoComm           = hasCoCommissionerRole(message.member);
-  const isCommissioner     = isFullCommissioner || isCoComm;
-
-  // ── Extract channel mentions from raw message ────────────────────────────────
-  // Commissioners may say "post in #general" — resolve those channel IDs now
-  const channelContext: { id: string; name: string }[] = [];
-  for (const [chId, ch] of message.mentions.channels) {
-    if (ch.isTextBased() && "name" in ch) {
-      channelContext.push({ id: chId, name: (ch as any).name });
-    }
-  }
-
-  // ── Gather all context in parallel ───────────────────────────────────────────
-  const defaultStats = () => ({
-    team: "Unknown", balance: 0,
-    allTimeH2HWins: 0, allTimeH2HLosses: 0,
-    seasonWins: 0, seasonLosses: 0, pointDiff: 0,
-    recentGames:    [] as { label: string }[],
-    topPlayers:     [] as { label: string }[],
-    rosterByGroup:  {} as Record<string, string[]>,
-    teamSeasonStats: "",
-    playerStatLines: [] as string[],
-  });
-
-  const guildId = message.guildId!;
-  const [isAdmin, userStats, rulesText, adminIds, leagueContext, eosContext, economyContext, mentionedUsersData] = await Promise.all([
-    isAdminUser(message.author.id, guildId).catch(() => false),
-    fetchUserStats(message.author.id, guildId).catch(defaultStats),
-    getCachedRules(guildId).catch(() => "(rules unavailable)"),
-    getCachedAdminIds().catch(() => [] as string[]),
-    fetchLeagueContext(guildId).catch(() => "(league context unavailable)"),
-    fetchEosPayoutContext(guildId).catch(() => ""),
-    fetchEconomyContext().catch(() => ""),
-    Promise.all(otherMentioned.map(async u => {
-      const member = message.mentions.members?.get(u.id) ?? message.guild?.members.cache.get(u.id);
-      const displayName = member?.displayName ?? u.username;
-      const stats = await fetchUserStats(u.id, guildId).catch(defaultStats);
-      return { displayName, stats } as MentionedUser;
-    })),
-  ]);
-
-  // Fetch live season rules + server settings so the AI always quotes commish-configured caps
-  const [activeSeason, guildSettings] = await Promise.all([
-    getOrCreateActiveSeason(guildId).catch(() => null),
-    getServerSettings(guildId).catch(() => null),
-  ]);
-  const seasonRules   = activeSeason ? await getSeasonRules(activeSeason).catch(() => null) : null;
-  const pricingBlock  = buildPricingBlock({
-    devUpsCap:  seasonRules?.devUpsCap    ?? LIMITS.devUpsPerSeason,
-    devUpsCost: seasonRules?.devUpsCost   ?? COSTS.dev_up,
-    ageResetsCap:  seasonRules?.ageResetsCap  ?? LIMITS.ageResetsPerSeason,
-    ageResetCost:  seasonRules?.ageResetCost  ?? COSTS.age_reset,
-  });
-
-  // Build the system prompt with current escalation level for this user
-  const escalationLevel    = isAdmin ? 0 : await getEscalationLevel(message.author.id).catch(() => 0);
-  const promptIsCommissioner = isCommissioner || isAdmin;
-  const systemPrompt = buildSystemPrompt(
-    rulesText, adminIds, userStats, isAdmin, mentionedUsersData, escalationLevel,
-    promptIsCommissioner, channelContext, leagueContext,
-    isCoComm && !isAdmin,
-    eosContext,
-    pricingBlock,
-    economyContext,
-  );
-
-  // Call the model (include per-user conversation history for context)
-  const priorHistory = getConversationHistory(message.author.id);
-  let raw = "";
   try {
-    const completion = await openai.chat.completions.create({
-      model:    "gpt-5-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...priorHistory,
-        { role: "user",   content },
-      ],
-    });
-    raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const season       = await getOrCreateActiveSeason(message.guildId!);
+    const currentWeek  = (season as any).currentWeek ?? "1";
+    const streamPayout = await getPayoutValue(PAYOUT_KEYS.STREAM_PAYOUT);
+
+    // Duplicate guard — one stream payout per user per week.
+    // We allow a re-try if there's a pending record with no commMessageId,
+    // which means a previous attempt created the DB row but crashed before
+    // the commissioner message was ever sent. In that case, delete the orphan
+    // and continue so we post a fresh commissioner approval request.
+    const [existing] = await db
+      .select({ id: pendingChannelPayoutsTable.id, commMessageId: pendingChannelPayoutsTable.commMessageId })
+      .from(pendingChannelPayoutsTable)
+      .where(and(
+        eq(pendingChannelPayoutsTable.type, "stream"),
+        eq(pendingChannelPayoutsTable.discordId, message.author.id),
+        eq(pendingChannelPayoutsTable.seasonId, season.id),
+        eq(pendingChannelPayoutsTable.week, currentWeek),
+        inArray(pendingChannelPayoutsTable.status, ["pending", "approved"]),
+      ))
+      .limit(1);
+
+    if (existing) {
+      if (existing.commMessageId) return; // commissioner message already sent (pending review or approved)
+      // Orphaned pending record — commMessage was never sent (e.g. bot crashed mid-handler).
+      // Delete it so we can re-try sending the commissioner approval message.
+      await db.delete(pendingChannelPayoutsTable).where(eq(pendingChannelPayoutsTable.id, existing.id));
+    }
+
+    // Look up the streamer's team (for display in embed)
+    const [userRow] = await db
+      .select({ team: usersTable.team })
+      .from(usersTable)
+      .where(eq(usersTable.discordId, message.author.id))
+      .limit(1);
+
+    const streamerTeam = userRow?.team ?? null;
+
+    const twitchMatch = message.content.match(TWITCH_URL_RE);
+    const twitchUrl   = twitchMatch ? twitchMatch[0] : "(link)";
+
+    // Stream payout: only the user who posts the stream gets paid (15 coins).
+    // Opponent is NOT paid regardless of whether this is H2H or a CPU game.
+    const payoutDesc = `+${streamPayout} coins → <@${message.author.id}>`;
+
+    // Insert pending payout record (without commMessageId yet)
+    const [inserted] = await db
+      .insert(pendingChannelPayoutsTable)
+      .values({
+        type:      "stream",
+        discordId: message.author.id,
+        amount:    streamPayout,
+        channelId: message.channelId,
+        messageId: message.id,
+        guildId:   message.guildId!,
+        seasonId:  season.id,
+        week:      currentWeek,
+      })
+      .returning({ id: pendingChannelPayoutsTable.id });
+
+    const payoutId = inserted?.id;
+    if (!payoutId) return;
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Purple)
+      .setTitle("🎮 Stream Payout — Approval Required")
+      .setDescription(
+        `<@${message.author.id}>${streamerTeam ? ` (${streamerTeam})` : ""} posted a Twitch stream this week.\n\n` +
+        `**Stream:** ${twitchUrl}\n\n` +
+        `**Payout:**\n${payoutDesc}`
+      )
+      .setFooter({ text: `Payout #${payoutId} • Week ${currentWeek}` })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`stream_approve:${payoutId}`)
+        .setLabel("✅ Approve & Pay Out")
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`stream_deny:${payoutId}`)
+        .setLabel("❌ Deny")
+        .setStyle(ButtonStyle.Danger),
+    );
+
+    const commMsg = await (commChannel as TextChannel).send({ embeds: [embed], components: [row] });
+
+    // Store the commissioner log message ID so we can update it on approval/denial
+    await db
+      .update(pendingChannelPayoutsTable)
+      .set({ commMessageId: commMsg.id })
+      .where(eq(pendingChannelPayoutsTable.id, payoutId));
+
   } catch (err) {
-    console.error("[REC Bot @ mention] OpenAI error:", err);
-    await message.reply("My brain short-circuited. Try again in a second. 🏈").catch(() => {});
+    console.error("handleStreamPost error:", err);
+  }
+}
+
+async function handleHighlightPost(message: Message): Promise<void> {
+  // Must have at least one video attachment
+  const videoAttachments = [...message.attachments.values()].filter(
+    a => a.contentType?.startsWith("video/"),
+  );
+  if (videoAttachments.length === 0) return;
+
+  const commChannelId = await getGuildChannel(message.guildId ?? PRIMARY_GUILD_ID, CHANNEL_KEYS.COMMISSIONER);
+  if (!commChannelId) { console.error("Commissioner channel not configured"); return; }
+
+  // Fetch commissioner channel FIRST — if unreachable, fail before touching the DB
+  const commChannel = await message.client.channels.fetch(commChannelId).catch(() => null);
+  if (!commChannel?.isTextBased()) {
+    console.error(`[handleHighlightPost] Cannot reach commissioner channel ${commChannelId} — skipping highlight payout for ${message.author.id}`);
     return;
   }
 
-  // ── Parse type tag ───────────────────────────────────────────────────────────
-  const isDispatch = /^\[TYPE:ADMIN_DISPATCH\]/i.test(raw);
-  const typeMatch  = raw.match(/^\[TYPE:(HELP|SMALLTALK|ROAST|APOLOGY)\]\n?/i);
-  const msgType    = isDispatch ? "ADMIN_DISPATCH" : (typeMatch?.[1] ?? "UNKNOWN").toUpperCase();
-  let   response   = raw.replace(/^\[TYPE:[A-Z_]+\]\n?/i, "").trim();
+  try {
+    const season          = await getOrCreateActiveSeason(message.guildId!);
+    const currentWeek     = (season as any).currentWeek ?? "1";
+    const isPlayoffWeek   = PLAYOFF_WEEKS_SET.has(currentWeek);
+    const highlightLimit  = await getPayoutValue(PAYOUT_KEYS.HIGHLIGHT_LIMIT);
+    const highlightPayout = await getPayoutValue(
+      isPlayoffWeek ? PAYOUT_KEYS.HIGHLIGHT_PLAYOFF_PAYOUT : PAYOUT_KEYS.HIGHLIGHT_PAYOUT,
+    );
 
-  // ── Chitchat gate — limit non-league conversation ─────────────────────────────
-  // Admins are always exempt; all other users get CHITCHAT_LIMIT SMALLTALK
-  // exchanges per reset window before being muted for 12 hours.
-  if (msgType === "SMALLTALK" && !isAdmin) {
-    const now = Date.now();
-    let rec = getChitchatRecord(message.author.id);
+    // Count payouts for this user this week where the commissioner message was actually sent.
+    // Orphaned pending records (no commMessageId) are excluded so a re-post can recover them.
+    const [countRow] = await db
+      .select({ total: count() })
+      .from(pendingChannelPayoutsTable)
+      .where(and(
+        eq(pendingChannelPayoutsTable.type, "highlight"),
+        eq(pendingChannelPayoutsTable.discordId, message.author.id),
+        eq(pendingChannelPayoutsTable.seasonId, season.id),
+        eq(pendingChannelPayoutsTable.week, currentWeek),
+        inArray(pendingChannelPayoutsTable.status, ["pending", "approved"]),
+        isNotNull(pendingChannelPayoutsTable.commMessageId),
+      ));
 
-    // Mute expired → reset so they get a fresh allowance
-    if (rec.muteUntil > 0 && rec.muteUntil <= now) {
-      rec = { count: 0, muteUntil: 0 };
-      chitchatMap.set(message.author.id, rec);
+    const usedSlots = Number(countRow?.total ?? 0);
+    if (usedSlots >= highlightLimit) return; // max reached — silently ignore
+
+    // Delete any orphaned pending records (no commMessageId) to make room for fresh attempts
+    await db.delete(pendingChannelPayoutsTable).where(and(
+      eq(pendingChannelPayoutsTable.type, "highlight"),
+      eq(pendingChannelPayoutsTable.discordId, message.author.id),
+      eq(pendingChannelPayoutsTable.seasonId, season.id),
+      eq(pendingChannelPayoutsTable.week, currentWeek),
+      eq(pendingChannelPayoutsTable.status, "pending"),
+      sql`${pendingChannelPayoutsTable.commMessageId} IS NULL`,
+    ));
+
+    // Each video in this message is a separate payout request (up to the weekly cap)
+    const [userRow] = await db
+      .select({ team: usersTable.team })
+      .from(usersTable)
+      .where(eq(usersTable.discordId, message.author.id))
+      .limit(1);
+
+    const posterTeam = userRow?.team ?? null;
+
+    let slotsToCreate = Math.min(videoAttachments.length, highlightLimit - usedSlots);
+
+    for (let i = 0; i < slotsToCreate; i++) {
+      const videoNum = usedSlots + i + 1; // 1-indexed
+
+      const [inserted] = await db
+        .insert(pendingChannelPayoutsTable)
+        .values({
+          type:      "highlight",
+          discordId: message.author.id,
+          amount:    highlightPayout,
+          channelId: message.channelId,
+          messageId: message.id,
+          guildId:   message.guildId!,
+          seasonId:  season.id,
+          week:      currentWeek,
+        })
+        .returning({ id: pendingChannelPayoutsTable.id });
+
+      const payoutId = inserted?.id;
+      if (!payoutId) continue;
+
+      const seasonLabel = isPlayoffWeek ? " 🏆 Postseason" : "";
+      const embed = new EmbedBuilder()
+        .setColor(isPlayoffWeek ? Colors.Gold : Colors.Orange)
+        .setTitle(`🎬 Highlight Payout${seasonLabel} — Approval Required`)
+        .setDescription(
+          `<@${message.author.id}>${posterTeam ? ` (${posterTeam})` : ""} posted a highlight video.\n\n` +
+          `**Video:** #${videoNum} this week (${highlightLimit} max paid per week)\n` +
+          `**Payout:** +${highlightPayout} coins → <@${message.author.id}>`
+        )
+        .setFooter({ text: `Payout #${payoutId} • Week ${currentWeek}` })
+        .setTimestamp();
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`highlight_approve:${payoutId}`)
+          .setLabel("✅ Approve & Pay Out")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`highlight_deny:${payoutId}`)
+          .setLabel("❌ Deny")
+          .setStyle(ButtonStyle.Danger),
+      );
+
+      const commMsg = await (commChannel as TextChannel).send({ embeds: [embed], components: [row] });
+
+      await db
+        .update(pendingChannelPayoutsTable)
+        .set({ commMessageId: commMsg.id })
+        .where(eq(pendingChannelPayoutsTable.id, payoutId));
     }
 
-    // Currently muted → silently ignore; league messages still go through
-    if (rec.muteUntil > now) return;
-
-    // Just exhausted their allowance → warn and start the 12-hour mute
-    if (rec.count >= CHITCHAT_LIMIT) {
-      chitchatMap.set(message.author.id, { count: rec.count, muteUntil: now + CHITCHAT_MUTE_MS });
-      await message.reply(CHITCHAT_WARNING).catch(() => {});
-      return;
-    }
-
-    // Still within allowance → let the reply through and increment
-    chitchatMap.set(message.author.id, { count: rec.count + 1, muteUntil: 0 });
-  }
-
-  // ── Parse and execute admin action (commissioner dispatch) ───────────────────
-  if (isDispatch) {
-    const actionMatch = response.match(/^\[ACTION:(\{[\s\S]*?\})\]\n?/);
-    if (actionMatch) {
-      response = response.slice(actionMatch[0].length).trim();
-      try {
-        const action = JSON.parse(actionMatch[1]!) as AdminAction;
-
-        if (isCoComm && !isAdmin) {
-          // ── Co-Commissioner: queue for approval ──────────────────────────
-          purgeExpiredCoCommActions();
-          const actionId = `cca-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          const issuerDisplayName = message.member?.displayName ?? message.author.username;
-          const pending: PendingCoCommAction = {
-            id: actionId,
-            action,
-            issuerId: message.author.id,
-            issuerDisplayName,
-            guildId: message.guild!.id,
-            originalChannelId: message.channelId,
-            summaryText: buildActionSummary(action),
-            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-          };
-          pendingCoCommActions.set(actionId, pending);
-
-          const commChannelId = await getGuildChannel(message.guildId ?? PRIMARY_GUILD_ID, CHANNEL_KEYS.COMMISSIONER);
-          if (commChannelId) {
-            try {
-              const commCh = await message.client.channels.fetch(commChannelId).catch(() => null) as TextChannel | null;
-              if (commCh) {
-                const approvalEmbed = new EmbedBuilder()
-                  .setColor(Colors.Yellow)
-                  .setTitle("🔔 Co-Commissioner Action — Awaiting Approval")
-                  .addFields(
-                    { name: "Requested By", value: `<@${message.author.id}> (Co-Commissioner)`, inline: true },
-                    { name: "Action",       value: action.type, inline: true },
-                    { name: "Details",      value: pending.summaryText },
-                  )
-                  .setFooter({ text: "Only Commissioners can approve or deny this action" })
-                  .setTimestamp();
-                const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                  new ButtonBuilder()
-                    .setCustomId(`cocomm-approve:${actionId}`)
-                    .setLabel("Approve")
-                    .setStyle(ButtonStyle.Success),
-                  new ButtonBuilder()
-                    .setCustomId(`cocomm-deny:${actionId}`)
-                    .setLabel("Deny")
-                    .setStyle(ButtonStyle.Danger),
-                );
-                await commCh.send({ embeds: [approvalEmbed], components: [row] });
-              }
-            } catch (err) {
-              console.error("Failed to post co-comm approval request:", err);
-            }
-          }
-        } else {
-          // ── Full Commissioner (or admin): execute immediately ────────────
-          const ctx: AdminActionContext = {
-            client:  message.client,
-            guild:   message.guild,
-            actorId: message.author.id,
-          };
-          const result = await executeAdminAction(action, ctx);
-          await message.reply(`${result}`).catch(() => {});
-        }
-      } catch (parseErr) {
-        console.error("Admin action JSON parse error:", parseErr, actionMatch[1]);
-        await message.reply("⚠️ Couldn't parse the action payload — nothing was executed. Check the bot logs.").catch(() => {});
-      }
-    }
-    // Fall through to send the AI's confirmation text below (if any)
-  }
-
-  if (!response) return;
-
-  // Update persistent escalation in DB (fire-and-forget; don't block the reply)
-  if (!isAdmin) recordInteraction(message.author.id, msgType).catch(() => {});
-
-  // Save this exchange to per-user conversation history (fire-and-forget)
-  appendToHistory(message.author.id, content, response);
-
-  // Split long responses into ≤1900-char chunks on newline/space boundaries
-  const chunks = splitIntoChunks(response, 1900);
-  for (let i = 0; i < chunks.length; i++) {
-    if (i === 0) {
-      await message.reply(chunks[i]!).catch(() => {});
-    } else if ("send" in message.channel) {
-      await (message.channel as any).send(chunks[i]!).catch(() => {});
-    }
+  } catch (err) {
+    console.error("handleHighlightPost error:", err);
   }
 }
 
-/** Split text into chunks of at most maxLen chars, breaking on newlines then spaces. */
-function splitIntoChunks(text: string, maxLen: number): string[] {
-  const chunks: string[] = [];
-  let remaining = text;
-  while (remaining.length > maxLen) {
-    // Prefer breaking on a newline within the window
-    let cut = remaining.lastIndexOf("\n", maxLen);
-    if (cut <= 0) cut = remaining.lastIndexOf(" ", maxLen);
-    if (cut <= 0) cut = maxLen; // no good break point — hard cut
-    chunks.push(remaining.slice(0, cut).trimEnd());
-    remaining = remaining.slice(cut).trimStart();
-  }
-  if (remaining) chunks.push(remaining);
-  return chunks;
-}
+
