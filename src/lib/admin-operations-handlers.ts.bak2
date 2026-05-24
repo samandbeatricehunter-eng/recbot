@@ -29,9 +29,11 @@ import {
 } from "./db-helpers.js";
 import { WEEK_SEQUENCE, weekLabel } from "./week-helpers.js";
 import { lookupNflDivision } from "./constants.js";
+import { generateFranchiseArticle, generateWeekPreview } from "./franchise-article.js";
 import { runWildcardAutomation, runOffseasonHistoricalPost } from "./wildcard-automation.js";
 import { runEosAutoPost } from "./eos-auto-post.js";
 import { getPayoutValue, PAYOUT_KEYS } from "./payout-config.js";
+import { sendArticleChunked } from "./send-article.js";
 import { runWeeklyMatchupsFlow } from "./weekly-matchups-runner.js";
 import { createPrivateGameChannelsForWeek } from "./game-channel-manager.js";
 import { PLAYOFF_WEEK_META, runPlayoffMatchupsFlow, payoutPlayoffRoundResults, autoDivisionBonus } from "./playoff-matchups-runner.js";
@@ -39,6 +41,7 @@ import axios from "axios";
 import { autoPayoutPlayoffGotw, purgeChannel } from "./gotw-helpers.js";
 import { checkAndNotifyWaitlist } from "../commands/waitlist.js";
 import { buildMatchupBanner, resolveLogoBuf } from "./matchup-image.js";
+import { generateMatchupBreakdown } from "./matchup-ai-breakdown.js";
 import { globalLogoPath } from "./gcs-reader.js";
 import { buildAdminOpsEmbed, buildAdminOpsRows, buildAdminImportAdvanceEmbed, buildAdminImportAdvanceRows, buildAdminEconomyEmbed, buildAdminEconomyRows, buildAdminServerEmbed, buildAdminServerRows } from "../commands/admin-operations.js";
 import { buildPayoutHubEmbed, buildPayoutHubRows } from "./admin-payout-handlers.js";
@@ -53,6 +56,7 @@ import { buildLeagueDataMainMenu } from "./league-data-handlers.js";
 import { getServerSettings, buildSettingsEmbed, buildSettingsRows } from "./server-settings.js";
 import { setGuildChannel } from "./db-helpers.js";
 import { rebuildHistoricalChannel } from "./wildcard-automation.js";
+import OpenAI from "./openai-fallback.js";
 
 
 
@@ -146,6 +150,8 @@ async function showAdminDepartmentMenu(interaction: any, title: string, descript
     components,
   });
 }
+    return;
+  }
 
   if (selected === "manage_economy") {
     await interaction.update({
@@ -549,8 +555,61 @@ async function handlePostCustomArticle(interaction: ButtonInteraction) {
 }
 
 async function handleModalCustomArticle(interaction: ModalSubmitInteraction) {
+  const guildId = interaction.guildId!;
+  const prompt  = interaction.fields.getTextInputValue("article_prompt").trim();
+
   await interaction.deferReply({ ephemeral: true });
-  await interaction.editReply({ content: "❌ AI article generation has been removed." });
+
+  try {
+    const headlinesChannelId = await getGuildChannel(guildId, CHANNEL_KEYS.HEADLINES);
+    if (!headlinesChannelId) {
+      await interaction.editReply({ content: "❌ No headlines channel configured. Set it via `/adminserver link_channel`." });
+      return;
+    }
+
+    const channel = (interaction.client.channels.cache.get(headlinesChannelId)
+      ?? await interaction.client.channels.fetch(headlinesChannelId).catch(() => null)) as TextChannel | null;
+    if (!channel?.isTextBased()) {
+      await interaction.editReply({ content: "❌ Headlines channel not found or inaccessible." });
+      return;
+    }
+
+    const response = await openaiClient.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You are an award-winning sports journalist covering The R.E.C. League — a competitive Madden NFL franchise simulation league.",
+            "Write in a bold, energetic, ESPN-style voice.",
+            "Use vivid prose paragraphs. Do NOT use markdown headers (##, ###) or bullet points — just flowing, punchy paragraphs.",
+            "Keep the article between 400–600 words unless the prompt implies a shorter piece.",
+            "IMPORTANT: Always start your response with a single line in exactly this format:",
+            "HEADLINE: <your headline here>",
+            "Then leave one blank line, then write the article body.",
+          ].join("\n"),
+        },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 1200,
+      temperature: 0.85,
+    });
+
+    const raw = response.choices[0]?.message?.content ?? "";
+    const lines = raw.split("\n");
+    const headlineLine = lines.find(l => l.startsWith("HEADLINE:"));
+    const headline = headlineLine ? headlineLine.replace("HEADLINE:", "").trim() : "Breaking News";
+    const bodyStart = headlineLine ? lines.indexOf(headlineLine) + 2 : 0;
+    const article   = lines.slice(bodyStart).join("\n").trim();
+
+    const header = `📰 **${headline}**\n\n`;
+    // article posting removed — sendArticleChunked archived
+
+    await interaction.editReply({ content: `✅ Custom article posted to <#${headlinesChannelId}>.` });
+  } catch (err) {
+    console.error("[admin-operations] Custom article error:", err);
+    await interaction.editReply({ content: `❌ Failed to generate or post article: ${err}` });
+  }
 }
 
 // ──  ──────────────────────────────────────────────────────────
