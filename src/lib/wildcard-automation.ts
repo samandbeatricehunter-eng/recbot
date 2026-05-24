@@ -840,14 +840,7 @@ export async function rebuildHistoricalChannel(
       set: { channelId: newChannel.id },
     });
 
-  // ── Season recap (historical channel only — no headlines @everyone) ───────────
-  try {
-    const { postSeasonRecap } = await import("./season-recap.js");
-    await postSeasonRecap(client, seasonId, seasonNumber, newChannel, /* skipHeadlines */ true, guild.id);
-  } catch (err) {
-    console.error("[rebuild] Season recap failed:", err);
-  }
-
+    // Season recap removed (franchise-article feature archived)
   // ── Awards (display only — no coin bonuses) ───────────────────────────────────
   try {
     await postAwardsDisplayOnly(newChannel, seasonId, seasonNumber);

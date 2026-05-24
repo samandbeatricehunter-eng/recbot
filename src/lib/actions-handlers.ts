@@ -14,6 +14,36 @@
  *   team-request-handlers.ts    — Request open team + waitlist
  */
 /**
+ * actions-handlers.ts  (slimmed — see individual handler files for extracted sections)
+ *
+ * Contains: types, session store, shared helpers, roster card builders,
+ *           main dispatch (handleActionsInteraction), coins section,
+ *           ROW 2 main roster display (handleMyRoster, handleAnyRosterShow).
+ *
+ * Delegated to split files:
+ *   purchase-flow-handlers.ts   — ROW 1 purchase flows
+ *   wager-handlers.ts           — Wager flow
+ *   player-browser-handlers.ts  — ROW 2 player/FA/all-players browser
+ *   team-stats-handlers.ts      — Team stats
+ *   rule-violation-handlers.ts  — Rule violation
+ *   team-request-handlers.ts    — Request open team + waitlist
+ */
+/**
+ * actions-handlers.ts  (slimmed — see individual handler files for extracted sections)
+ *
+ * Contains: types, session store, shared helpers, roster card builders,
+ *           main dispatch (handleActionsInteraction), coins section,
+ *           ROW 2 main roster display (handleMyRoster, handleAnyRosterShow).
+ *
+ * Delegated to split files:
+ *   purchase-flow-handlers.ts   — ROW 1 purchase flows
+ *   wager-handlers.ts           — Wager flow
+ *   player-browser-handlers.ts  — ROW 2 player/FA/all-players browser
+ *   team-stats-handlers.ts      — Team stats
+ *   rule-violation-handlers.ts  — Rule violation
+ *   team-request-handlers.ts    — Request open team + waitlist
+ */
+/**
  * /actions hub — all member-facing interactions with prefix ac_
  * Session TTL: 15 minutes (keyed by `${guildId}:${userId}`)
  */
@@ -74,6 +104,22 @@ import { handleRcPosPick, handleRcPosSel, showPlayerDropdown, handleRcPlayerSel,
 import { handleTeamStatsTeamPick, handleTeamStatsShow, handleStandingsConfPick, handleStandingsShow, handleInTheHunt, handleTeamsToWatch, handleAnyUserStatsTeamPick, handleAnyUserStatsConfPick, handleAnyUserStatsShow, handleSeasonPR, handleAllTimePR, handleGlobalPR, handleWeeklyPayouts, handleEosPayouts, handleMilestonePayouts, handleActiveTeams, handleOpenTeams, handleAutoPilotModal, handleAutoPilotSubmit, handleApproveAutoPilot, handleDenyAutoPilot } from "./team-stats-handlers.js";
 import { handleViolationModal, handleViolationSubmit, handleViolationApprove, handleViolationDeny, handleViolationDenySubmit, handleViolationNote, handleRulesStart, buildRulesSectionEmbed, buildRulesSectionButtons, handleRulesSection, handleRulesPage, handleRulesDisplayChoice, handleRulesDisplayFull, handleRulesDisplayByNumModal, handleRulesByNumSubmit, handleRulesClose } from "./rule-violation-handlers.js";
 import { buildOpenTeamSelectRows, buildAllTeamSelectRows, getTakenTeams, handleReqOpenTeam, handleReqOpenTeamSel, handleReqOpenTeamSubmit, handleReqAddWaitlist, handleReqWaitlistSel, handleReqWaitlistNext, handleReqRmWaitlist, handleReqRmWaitlistConfirm, handleSchedule } from "./team-request-handlers.js";
+import { getSession, touchSession } from "./actions-shared.js";
+export * from "./actions-shared.js";
+
+import { weekKeyToIndex, spreadLabel, spreadDescription, buildOpponentSelectRows, handleWagerStart, handleWagerGameSelect, handleWagerTeamPick, handleWagerSpreadSelect, handleWagerBackToTeam, handleWagerSpreadNext, handleWagerAmountSubmit, handleWagerOpponentSelect, handleWagerBackToSpread, handleWagerSend } from "./wager-handlers.js";
+import { handleRcPosPick, handleRcPosSel, showPlayerDropdown, handleRcPlayerSel, showPlayerCardPage, handleRcCardPage, handleRcBackToPlayers, handleRcTeamStats, handleRcBackToRoster, sortStackLabel, sortBtnLabel, buildSortPageRows, buildSortNavRow, buildDevFilterRow, toggleSortKey, toggleDevFilter, buildWeightedScoreExpr, buildApOrderBy, buildSortStackSummary, buildApFilterSummary, handleFreeAgentsPosPick, handleFaPosSel, showFaPlayerList, handleFaPlayerSel, showFaCard, handleFaCardPage, handleFaBackToPlayers, handleAllPlayersPosPick, handleAllPlayersPosSel, showApPlayerList, handleApPlayerSel, showApCard, handleApCardPage, handleApBackToPlayers, buildApFilterActionRow, showApFilterScreen, handleApFilterScreen, handleApSortToggle, handleApDevToggle, handleApDevClear, handleApSortClear, handleApSortPage, handleApFilterNameModal, handleApFilterNameSubmit, handleApFilterApply, handleApFilterClear, buildFaFilterSummary, buildFaFilterActionRow, showFaFilterScreen, handleFaFilterScreen, handleFaSortToggle, handleFaDevToggle, handleFaDevClear, handleFaSortClear, handleFaSortPage, handleFaFilterNameModal, handleFaFilterNameSubmit, handleFaFilterApply, handleFaFilterClear } from "./player-browser-handlers.js";
+import { handleTeamStatsTeamPick, handleTeamStatsShow, handleStandingsConfPick, handleStandingsShow, handleInTheHunt, handleTeamsToWatch, handleAnyUserStatsTeamPick, handleAnyUserStatsConfPick, handleAnyUserStatsShow, handleSeasonPR, handleAllTimePR, handleGlobalPR, handleWeeklyPayouts, handleEosPayouts, handleMilestonePayouts, handleActiveTeams, handleOpenTeams, handleAutoPilotModal, handleAutoPilotSubmit, handleApproveAutoPilot, handleDenyAutoPilot } from "./team-stats-handlers.js";
+import { handleViolationModal, handleViolationSubmit, handleViolationApprove, handleViolationDeny, handleViolationDenySubmit, handleViolationNote, handleRulesStart, buildRulesSectionEmbed, buildRulesSectionButtons, handleRulesSection, handleRulesPage, handleRulesDisplayChoice, handleRulesDisplayFull, handleRulesDisplayByNumModal, handleRulesByNumSubmit, handleRulesClose } from "./rule-violation-handlers.js";
+import { buildOpenTeamSelectRows, buildAllTeamSelectRows, getTakenTeams, handleReqOpenTeam, handleReqOpenTeamSel, handleReqOpenTeamSubmit, handleReqAddWaitlist, handleReqWaitlistSel, handleReqWaitlistNext, handleReqRmWaitlist, handleReqRmWaitlistConfirm, handleSchedule, handleCoins, handleBankTransfer, handleBankTransferDir, handleBankTransferSubmit, handleSendCoinsModal, handleSendCoinsSubmit } from "./team-request-handlers.js";
+import { getSession, touchSession } from "./actions-shared.js";
+export * from "./actions-shared.js";
+
+import { weekKeyToIndex, spreadLabel, spreadDescription, buildOpponentSelectRows, handleWagerStart, handleWagerGameSelect, handleWagerTeamPick, handleWagerSpreadSelect, handleWagerBackToTeam, handleWagerSpreadNext, handleWagerAmountSubmit, handleWagerOpponentSelect, handleWagerBackToSpread, handleWagerSend } from "./wager-handlers.js";
+import { handleRcPosPick, handleRcPosSel, showPlayerDropdown, handleRcPlayerSel, showPlayerCardPage, handleRcCardPage, handleRcBackToPlayers, handleRcTeamStats, handleRcBackToRoster, sortStackLabel, sortBtnLabel, buildSortPageRows, buildSortNavRow, buildDevFilterRow, toggleSortKey, toggleDevFilter, buildWeightedScoreExpr, buildApOrderBy, buildSortStackSummary, buildApFilterSummary, handleFreeAgentsPosPick, handleFaPosSel, showFaPlayerList, handleFaPlayerSel, showFaCard, handleFaCardPage, handleFaBackToPlayers, handleAllPlayersPosPick, handleAllPlayersPosSel, showApPlayerList, handleApPlayerSel, showApCard, handleApCardPage, handleApBackToPlayers, buildApFilterActionRow, showApFilterScreen, handleApFilterScreen, handleApSortToggle, handleApDevToggle, handleApDevClear, handleApSortClear, handleApSortPage, handleApFilterNameModal, handleApFilterNameSubmit, handleApFilterApply, handleApFilterClear, buildFaFilterSummary, buildFaFilterActionRow, showFaFilterScreen, handleFaFilterScreen, handleFaSortToggle, handleFaDevToggle, handleFaDevClear, handleFaSortClear, handleFaSortPage, handleFaFilterNameModal, handleFaFilterNameSubmit, handleFaFilterApply, handleFaFilterClear } from "./player-browser-handlers.js";
+import { handleTeamStatsTeamPick, handleTeamStatsShow, handleStandingsConfPick, handleStandingsShow, handleInTheHunt, handleTeamsToWatch, handleAnyUserStatsTeamPick, handleAnyUserStatsConfPick, handleAnyUserStatsShow, handleSeasonPR, handleAllTimePR, handleGlobalPR, handleWeeklyPayouts, handleEosPayouts, handleMilestonePayouts, handleActiveTeams, handleOpenTeams, handleAutoPilotModal, handleAutoPilotSubmit, handleApproveAutoPilot, handleDenyAutoPilot } from "./team-stats-handlers.js";
+import { handleViolationModal, handleViolationSubmit, handleViolationApprove, handleViolationDeny, handleViolationDenySubmit, handleViolationNote, handleRulesStart, buildRulesSectionEmbed, buildRulesSectionButtons, handleRulesSection, handleRulesPage, handleRulesDisplayChoice, handleRulesDisplayFull, handleRulesDisplayByNumModal, handleRulesByNumSubmit, handleRulesClose } from "./rule-violation-handlers.js";
+import { buildOpenTeamSelectRows, buildAllTeamSelectRows, getTakenTeams, handleReqOpenTeam, handleReqOpenTeamSel, handleReqOpenTeamSubmit, handleReqAddWaitlist, handleReqWaitlistSel, handleReqWaitlistNext, handleReqRmWaitlist, handleReqRmWaitlistConfirm, handleSchedule, handleCoins, handleBankTransfer, handleBankTransferDir, handleBankTransferSubmit, handleSendCoinsModal, handleSendCoinsSubmit, handleCoins, handleBankTransfer, handleBankTransferDir, handleBankTransferSubmit, handleSendCoinsModal, handleSendCoinsSubmit } from "./team-request-handlers.js";
 import { getSession, touchSession } from "./actions-shared.js";
 export * from "./actions-shared.js";
 
@@ -695,6 +741,10 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]!);
 }
 function fmtDiff(n: number): string { return n >= 0 ? `+${n}` : `${n}`; }
+
+
+
+
 
 
 
@@ -7137,6 +7187,494 @@ async function handleSchedule(interaction: ButtonInteraction, sess: ActionsSessi
     ],
   });
 }
+
+// ── Coins ─────────────────────────────────────────────────────────────────────
+
+async function handleCoins(interaction: ButtonInteraction, sess: ActionsSession) {
+  const gid  = interaction.guildId!;
+  const user = await getOrCreateUser(interaction.user.id, interaction.user.username, gid);
+
+  const savingsRow = (await db.select({ balance: userSavingsTable.balance }).from(userSavingsTable)
+    .where(eq(userSavingsTable.discordId, interaction.user.id))
+    .limit(1))[0];
+
+  const savings = savingsRow?.balance ?? 0;
+  const total   = user.balance + savings;
+
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Gold)
+    .setTitle("🪙 Your Coin Balance")
+    .addFields(
+      { name: "💰 Wallet",  value: `**${user.balance.toLocaleString()}** coins`, inline: true },
+      { name: "🏦 Savings", value: `**${savings.toLocaleString()}** coins`, inline: true },
+      { name: "📊 Total",   value: `**${total.toLocaleString()}** coins`, inline: true },
+    )
+    .setTimestamp();
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ac_send_coins_modal").setLabel("📤 Send Coins").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("ac_transfer").setLabel("💸 Transfer").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ac_hub").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ac_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+  );
+
+  await interaction.update({ embeds: [embed], components: [row] });
+}
+
+async function handleBankTransfer(interaction: ButtonInteraction, sess: ActionsSession) {
+  const gid  = interaction.guildId!;
+  const [user, savingsRow, rateBps, lastRunRow] = await Promise.all([
+    getOrCreateUser(interaction.user.id, interaction.user.username, gid),
+    db.select({ balance: userSavingsTable.balance }).from(userSavingsTable)
+      .where(eq(userSavingsTable.discordId, interaction.user.id)).limit(1).then(r => r[0]),
+    getSavingsInterestRateBps(),
+    db.select({ value: payoutConfigTable.value }).from(payoutConfigTable)
+      .where(eq(payoutConfigTable.key, "savings_last_interest_at")).limit(1).then(r => r[0]),
+  ]);
+  const savings = savingsRow?.balance ?? 0;
+
+  // Projected daily interest
+  const projectedInterest = rateBps > 0 && savings > 0
+    ? Math.ceil(savings * rateBps / 10000)
+    : 0;
+  const ratePercent = (rateBps / 100).toFixed(2);
+
+  // Time until next payout
+  let nextPayoutStr = "~24h from last payout";
+  if (lastRunRow?.value) {
+    const lastRunMs   = lastRunRow.value * 1000;
+    const nextRunMs   = lastRunMs + 24 * 60 * 60 * 1000;
+    const msleft      = nextRunMs - Date.now();
+    if (msleft > 0) {
+      const hLeft = Math.floor(msleft / (60 * 60 * 1000));
+      const mLeft = Math.floor((msleft % (60 * 60 * 1000)) / 60000);
+      nextPayoutStr = `~${hLeft}h ${mLeft}m`;
+    } else {
+      nextPayoutStr = "very soon";
+    }
+  }
+
+  let interestFieldValue: string;
+  if (rateBps <= 0) {
+    interestFieldValue = "No interest rate currently set.";
+  } else if (savings <= 0) {
+    interestFieldValue = `Rate: **${ratePercent}%**/day\nDeposit coins to start earning.`;
+  } else {
+    interestFieldValue = `**+${projectedInterest.toLocaleString()} coins** next payout\nRate: **${ratePercent}%**/day · Next: **${nextPayoutStr}**`;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Gold)
+    .setTitle("💸 Transfer — Choose Direction")
+    .setDescription("Move coins between your wallet and savings account.")
+    .addFields(
+      { name: "💰 Wallet",  value: `**${user.balance.toLocaleString()}** coins`, inline: true },
+      { name: "🏦 Savings", value: `**${savings.toLocaleString()}** coins`, inline: true },
+      { name: "📈 Projected Interest", value: interestFieldValue, inline: false },
+    );
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ac_transfer_dir:IN").setLabel("➡ Wallet → Savings").setStyle(ButtonStyle.Primary).setDisabled(user.balance <= 0),
+    new ButtonBuilder().setCustomId("ac_transfer_dir:OUT").setLabel("⬅ Savings → Wallet").setStyle(ButtonStyle.Success).setDisabled(savings <= 0),
+    new ButtonBuilder().setCustomId("ac_coins").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ac_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+  );
+
+  await interaction.update({ embeds: [embed], components: [row] });
+}
+
+async function handleBankTransferDir(interaction: ButtonInteraction) {
+  const dir   = interaction.customId.split(":")[1] as "IN" | "OUT";
+  const label = dir === "IN" ? "Wallet → Savings" : "Savings → Wallet";
+  const modal = new ModalBuilder()
+    .setCustomId(`ac_modal_transfer:${dir}`)
+    .setTitle(`Transfer: ${label}`)
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("amount")
+          .setLabel("Amount to transfer (coins)")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("e.g. 500")
+          .setRequired(true)
+          .setMaxLength(20),
+      ),
+    );
+  await interaction.showModal(modal);
+}
+
+async function handleBankTransferSubmit(interaction: ModalSubmitInteraction) {
+  const dir       = interaction.customId.split(":")[1] as "IN" | "OUT";
+  const amountStr = interaction.fields.getTextInputValue("amount").trim();
+  const amount    = parseInt(amountStr, 10);
+  const gid       = interaction.guildId!;
+
+  if (isNaN(amount) || amount < 1) {
+    await interaction.reply({ content: "❌ Please enter a valid positive amount.", ephemeral: true });
+    return;
+  }
+
+  const user = await getOrCreateUser(interaction.user.id, interaction.user.username, gid);
+  const savingsRow = (await db.select({ balance: userSavingsTable.balance }).from(userSavingsTable)
+    .where(eq(userSavingsTable.discordId, interaction.user.id)).limit(1))[0];
+  const savings = savingsRow?.balance ?? 0;
+
+  if (dir === "IN") {
+    if (user.balance < amount) {
+      await interaction.reply({ content: `❌ Insufficient wallet balance. You have **${user.balance.toLocaleString()}** coins.`, ephemeral: true });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(usersTable)
+        .set({ balance: user.balance - amount })
+        .where(and(eq(usersTable.discordId, interaction.user.id), eq(usersTable.guildId, gid)));
+      if (savingsRow) {
+        await tx.update(userSavingsTable)
+          .set({ balance: savings + amount })
+          .where(eq(userSavingsTable.discordId, interaction.user.id));
+      } else {
+        await tx.insert(userSavingsTable).values({ discordId: interaction.user.id, balance: amount });
+      }
+    });
+    await interaction.reply({
+      content: `✅ Transferred **${amount.toLocaleString()}** coins to savings.\n💰 Wallet: **${(user.balance - amount).toLocaleString()}** | 🏦 Savings: **${(savings + amount).toLocaleString()}**`,
+      ephemeral: true,
+    });
+  } else {
+    if (savings < amount) {
+      await interaction.reply({ content: `❌ Insufficient savings balance. You have **${savings.toLocaleString()}** coins in savings.`, ephemeral: true });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(usersTable)
+        .set({ balance: user.balance + amount })
+        .where(and(eq(usersTable.discordId, interaction.user.id), eq(usersTable.guildId, gid)));
+      if (savingsRow) {
+        await tx.update(userSavingsTable)
+          .set({ balance: savings - amount })
+          .where(eq(userSavingsTable.discordId, interaction.user.id));
+      }
+    });
+    await interaction.reply({
+      content: `✅ Transferred **${amount.toLocaleString()}** coins to wallet.\n💰 Wallet: **${(user.balance + amount).toLocaleString()}** | 🏦 Savings: **${(savings - amount).toLocaleString()}**`,
+      ephemeral: true,
+    });
+  }
+}
+
+async function handleSendCoinsModal(interaction: ButtonInteraction) {
+  const modal = new ModalBuilder()
+    .setCustomId("ac_modal_sendcoins")
+    .setTitle("Send Coins")
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("recipient").setLabel("Recipient's Discord username or @mention").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("amount").setLabel("Amount (coins)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("e.g. 100"),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("note").setLabel("Note (optional)").setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+      ),
+    );
+  await interaction.showModal(modal);
+}
+
+async function handleSendCoinsSubmit(interaction: ModalSubmitInteraction, sess: ActionsSession) {
+  const recipientInput = interaction.fields.getTextInputValue("recipient").trim().replace(/[<@!>]/g, "");
+  const amountStr      = interaction.fields.getTextInputValue("amount").trim();
+  const note           = interaction.fields.getTextInputValue("note").trim();
+  const gid            = interaction.guildId!;
+  const amount         = parseInt(amountStr, 10);
+
+  if (isNaN(amount) || amount < 1) {
+    await interaction.reply({ content: "❌ Invalid amount.", ephemeral: true }); return;
+  }
+
+  // Try to find recipient by Discord ID or username
+  const recipientRow = (await db.select({ discordId: usersTable.discordId, discordUsername: usersTable.discordUsername })
+    .from(usersTable)
+    .where(and(
+      eq(usersTable.guildId, gid),
+      sql`lower(${usersTable.discordUsername}) = lower(${recipientInput}) OR ${usersTable.discordId} = ${recipientInput}`,
+    ))
+    .limit(1))[0];
+
+  if (!recipientRow) {
+    await interaction.reply({ content: `❌ Could not find user **${recipientInput}** in this server.`, ephemeral: true }); return;
+  }
+
+  if (recipientRow.discordId === interaction.user.id) {
+    await interaction.reply({ content: "❌ You can't send coins to yourself.", ephemeral: true }); return;
+  }
+
+  const sender = await getOrCreateUser(interaction.user.id, interaction.user.username, gid);
+  if (sender.balance < amount) {
+    await interaction.reply({ content: `❌ Insufficient coins. You have **${sender.balance.toLocaleString()}**, trying to send **${amount.toLocaleString()}**.`, ephemeral: true }); return;
+  }
+
+  await getOrCreateUser(recipientRow.discordId, recipientRow.discordUsername, gid);
+  await deductBalance(interaction.user.id, amount, gid);
+  await addBalance(recipientRow.discordId, amount, gid);
+  await logTransaction(interaction.user.id, -amount, "sendcoins_sent",     `Sent to ${recipientRow.discordUsername}${note ? `: ${note}` : ""}`,        gid, recipientRow.discordId);
+  await logTransaction(recipientRow.discordId, amount, "sendcoins_received", `Received from ${interaction.user.username}${note ? `: ${note}` : ""}`, gid, interaction.user.id);
+
+  await interaction.reply({
+    ephemeral: true,
+    embeds: [new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle("✅ Coins Sent")
+      .setDescription(`Sent **${amount.toLocaleString()} coins** to **${recipientRow.discordUsername}**${note ? `\n*"${note}"*` : ""}`)],
+    components: [backToHubRow()],
+  });
+}
+
+
+
+
+// ── Coins ─────────────────────────────────────────────────────────────────────
+
+async function handleCoins(interaction: ButtonInteraction, sess: ActionsSession) {
+  const gid  = interaction.guildId!;
+  const user = await getOrCreateUser(interaction.user.id, interaction.user.username, gid);
+
+  const savingsRow = (await db.select({ balance: userSavingsTable.balance }).from(userSavingsTable)
+    .where(eq(userSavingsTable.discordId, interaction.user.id))
+    .limit(1))[0];
+
+  const savings = savingsRow?.balance ?? 0;
+  const total   = user.balance + savings;
+
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Gold)
+    .setTitle("🪙 Your Coin Balance")
+    .addFields(
+      { name: "💰 Wallet",  value: `**${user.balance.toLocaleString()}** coins`, inline: true },
+      { name: "🏦 Savings", value: `**${savings.toLocaleString()}** coins`, inline: true },
+      { name: "📊 Total",   value: `**${total.toLocaleString()}** coins`, inline: true },
+    )
+    .setTimestamp();
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ac_send_coins_modal").setLabel("📤 Send Coins").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("ac_transfer").setLabel("💸 Transfer").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ac_hub").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ac_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+  );
+
+  await interaction.update({ embeds: [embed], components: [row] });
+}
+
+async function handleBankTransfer(interaction: ButtonInteraction, sess: ActionsSession) {
+  const gid  = interaction.guildId!;
+  const [user, savingsRow, rateBps, lastRunRow] = await Promise.all([
+    getOrCreateUser(interaction.user.id, interaction.user.username, gid),
+    db.select({ balance: userSavingsTable.balance }).from(userSavingsTable)
+      .where(eq(userSavingsTable.discordId, interaction.user.id)).limit(1).then(r => r[0]),
+    getSavingsInterestRateBps(),
+    db.select({ value: payoutConfigTable.value }).from(payoutConfigTable)
+      .where(eq(payoutConfigTable.key, "savings_last_interest_at")).limit(1).then(r => r[0]),
+  ]);
+  const savings = savingsRow?.balance ?? 0;
+
+  // Projected daily interest
+  const projectedInterest = rateBps > 0 && savings > 0
+    ? Math.ceil(savings * rateBps / 10000)
+    : 0;
+  const ratePercent = (rateBps / 100).toFixed(2);
+
+  // Time until next payout
+  let nextPayoutStr = "~24h from last payout";
+  if (lastRunRow?.value) {
+    const lastRunMs   = lastRunRow.value * 1000;
+    const nextRunMs   = lastRunMs + 24 * 60 * 60 * 1000;
+    const msleft      = nextRunMs - Date.now();
+    if (msleft > 0) {
+      const hLeft = Math.floor(msleft / (60 * 60 * 1000));
+      const mLeft = Math.floor((msleft % (60 * 60 * 1000)) / 60000);
+      nextPayoutStr = `~${hLeft}h ${mLeft}m`;
+    } else {
+      nextPayoutStr = "very soon";
+    }
+  }
+
+  let interestFieldValue: string;
+  if (rateBps <= 0) {
+    interestFieldValue = "No interest rate currently set.";
+  } else if (savings <= 0) {
+    interestFieldValue = `Rate: **${ratePercent}%**/day\nDeposit coins to start earning.`;
+  } else {
+    interestFieldValue = `**+${projectedInterest.toLocaleString()} coins** next payout\nRate: **${ratePercent}%**/day · Next: **${nextPayoutStr}**`;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Gold)
+    .setTitle("💸 Transfer — Choose Direction")
+    .setDescription("Move coins between your wallet and savings account.")
+    .addFields(
+      { name: "💰 Wallet",  value: `**${user.balance.toLocaleString()}** coins`, inline: true },
+      { name: "🏦 Savings", value: `**${savings.toLocaleString()}** coins`, inline: true },
+      { name: "📈 Projected Interest", value: interestFieldValue, inline: false },
+    );
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("ac_transfer_dir:IN").setLabel("➡ Wallet → Savings").setStyle(ButtonStyle.Primary).setDisabled(user.balance <= 0),
+    new ButtonBuilder().setCustomId("ac_transfer_dir:OUT").setLabel("⬅ Savings → Wallet").setStyle(ButtonStyle.Success).setDisabled(savings <= 0),
+    new ButtonBuilder().setCustomId("ac_coins").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ac_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+  );
+
+  await interaction.update({ embeds: [embed], components: [row] });
+}
+
+async function handleBankTransferDir(interaction: ButtonInteraction) {
+  const dir   = interaction.customId.split(":")[1] as "IN" | "OUT";
+  const label = dir === "IN" ? "Wallet → Savings" : "Savings → Wallet";
+  const modal = new ModalBuilder()
+    .setCustomId(`ac_modal_transfer:${dir}`)
+    .setTitle(`Transfer: ${label}`)
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("amount")
+          .setLabel("Amount to transfer (coins)")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("e.g. 500")
+          .setRequired(true)
+          .setMaxLength(20),
+      ),
+    );
+  await interaction.showModal(modal);
+}
+
+async function handleBankTransferSubmit(interaction: ModalSubmitInteraction) {
+  const dir       = interaction.customId.split(":")[1] as "IN" | "OUT";
+  const amountStr = interaction.fields.getTextInputValue("amount").trim();
+  const amount    = parseInt(amountStr, 10);
+  const gid       = interaction.guildId!;
+
+  if (isNaN(amount) || amount < 1) {
+    await interaction.reply({ content: "❌ Please enter a valid positive amount.", ephemeral: true });
+    return;
+  }
+
+  const user = await getOrCreateUser(interaction.user.id, interaction.user.username, gid);
+  const savingsRow = (await db.select({ balance: userSavingsTable.balance }).from(userSavingsTable)
+    .where(eq(userSavingsTable.discordId, interaction.user.id)).limit(1))[0];
+  const savings = savingsRow?.balance ?? 0;
+
+  if (dir === "IN") {
+    if (user.balance < amount) {
+      await interaction.reply({ content: `❌ Insufficient wallet balance. You have **${user.balance.toLocaleString()}** coins.`, ephemeral: true });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(usersTable)
+        .set({ balance: user.balance - amount })
+        .where(and(eq(usersTable.discordId, interaction.user.id), eq(usersTable.guildId, gid)));
+      if (savingsRow) {
+        await tx.update(userSavingsTable)
+          .set({ balance: savings + amount })
+          .where(eq(userSavingsTable.discordId, interaction.user.id));
+      } else {
+        await tx.insert(userSavingsTable).values({ discordId: interaction.user.id, balance: amount });
+      }
+    });
+    await interaction.reply({
+      content: `✅ Transferred **${amount.toLocaleString()}** coins to savings.\n💰 Wallet: **${(user.balance - amount).toLocaleString()}** | 🏦 Savings: **${(savings + amount).toLocaleString()}**`,
+      ephemeral: true,
+    });
+  } else {
+    if (savings < amount) {
+      await interaction.reply({ content: `❌ Insufficient savings balance. You have **${savings.toLocaleString()}** coins in savings.`, ephemeral: true });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(usersTable)
+        .set({ balance: user.balance + amount })
+        .where(and(eq(usersTable.discordId, interaction.user.id), eq(usersTable.guildId, gid)));
+      if (savingsRow) {
+        await tx.update(userSavingsTable)
+          .set({ balance: savings - amount })
+          .where(eq(userSavingsTable.discordId, interaction.user.id));
+      }
+    });
+    await interaction.reply({
+      content: `✅ Transferred **${amount.toLocaleString()}** coins to wallet.\n💰 Wallet: **${(user.balance + amount).toLocaleString()}** | 🏦 Savings: **${(savings - amount).toLocaleString()}**`,
+      ephemeral: true,
+    });
+  }
+}
+
+async function handleSendCoinsModal(interaction: ButtonInteraction) {
+  const modal = new ModalBuilder()
+    .setCustomId("ac_modal_sendcoins")
+    .setTitle("Send Coins")
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("recipient").setLabel("Recipient's Discord username or @mention").setStyle(TextInputStyle.Short).setRequired(true),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("amount").setLabel("Amount (coins)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("e.g. 100"),
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("note").setLabel("Note (optional)").setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+      ),
+    );
+  await interaction.showModal(modal);
+}
+
+async function handleSendCoinsSubmit(interaction: ModalSubmitInteraction, sess: ActionsSession) {
+  const recipientInput = interaction.fields.getTextInputValue("recipient").trim().replace(/[<@!>]/g, "");
+  const amountStr      = interaction.fields.getTextInputValue("amount").trim();
+  const note           = interaction.fields.getTextInputValue("note").trim();
+  const gid            = interaction.guildId!;
+  const amount         = parseInt(amountStr, 10);
+
+  if (isNaN(amount) || amount < 1) {
+    await interaction.reply({ content: "❌ Invalid amount.", ephemeral: true }); return;
+  }
+
+  // Try to find recipient by Discord ID or username
+  const recipientRow = (await db.select({ discordId: usersTable.discordId, discordUsername: usersTable.discordUsername })
+    .from(usersTable)
+    .where(and(
+      eq(usersTable.guildId, gid),
+      sql`lower(${usersTable.discordUsername}) = lower(${recipientInput}) OR ${usersTable.discordId} = ${recipientInput}`,
+    ))
+    .limit(1))[0];
+
+  if (!recipientRow) {
+    await interaction.reply({ content: `❌ Could not find user **${recipientInput}** in this server.`, ephemeral: true }); return;
+  }
+
+  if (recipientRow.discordId === interaction.user.id) {
+    await interaction.reply({ content: "❌ You can't send coins to yourself.", ephemeral: true }); return;
+  }
+
+  const sender = await getOrCreateUser(interaction.user.id, interaction.user.username, gid);
+  if (sender.balance < amount) {
+    await interaction.reply({ content: `❌ Insufficient coins. You have **${sender.balance.toLocaleString()}**, trying to send **${amount.toLocaleString()}**.`, ephemeral: true }); return;
+  }
+
+  await getOrCreateUser(recipientRow.discordId, recipientRow.discordUsername, gid);
+  await deductBalance(interaction.user.id, amount, gid);
+  await addBalance(recipientRow.discordId, amount, gid);
+  await logTransaction(interaction.user.id, -amount, "sendcoins_sent",     `Sent to ${recipientRow.discordUsername}${note ? `: ${note}` : ""}`,        gid, recipientRow.discordId);
+  await logTransaction(recipientRow.discordId, amount, "sendcoins_received", `Received from ${interaction.user.username}${note ? `: ${note}` : ""}`, gid, interaction.user.id);
+
+  await interaction.reply({
+    ephemeral: true,
+    embeds: [new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle("✅ Coins Sent")
+      .setDescription(`Sent **${amount.toLocaleString()} coins** to **${recipientRow.discordUsername}**${note ? `\n*"${note}"*` : ""}`)],
+    components: [backToHubRow()],
+  });
+}
+
+
+
 
 // ── Coins ─────────────────────────────────────────────────────────────────────
 

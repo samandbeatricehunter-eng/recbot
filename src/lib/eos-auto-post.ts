@@ -170,7 +170,7 @@ export async function runEosAutoPost(
 
   // ── 6b. Derive playoff picture (same source as test run + /standings) ─────────
   // Uses standings data rather than usersTable.playoffSeed, which may not be set.
-  const allStandings = await getArticleStandings(seasonId, 18);
+  const allStandings: any[] = []; // article-posts removed
   const playoffDiscordIds = new Set<string>();
   let standingsDataAvailable = false;
 
@@ -197,7 +197,7 @@ export async function runEosAutoPost(
   }
 
   // ── 6c. Compute PR rankings (same source as /seasonpr and test run) ───────────
-  const { records: prRecords } = await getSeasonRecords(seasonId);
+  const prRecords: any[] = []; // article-posts removed
   const prRankMap = new Map<string, { rank: number; score: number; bonus: number }>();
   let prDataAvailable = false;
 

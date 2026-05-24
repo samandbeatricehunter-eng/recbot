@@ -8,7 +8,6 @@ import {
 } from "../lib/gotw-helpers.js";
 import { buildTeamToDiscord } from "../lib/weekly-matchups-runner.js";
 import { getPayoutValue, PAYOUT_KEYS } from "../lib/payout-config.js";
-import { logTradeEvent } from "../lib/league-twitter.js";
 import { waitlistTable } from "@workspace/db";
 import {
   WAITLIST_ACCEPT_PREFIX, WAITLIST_DENY_PREFIX,
