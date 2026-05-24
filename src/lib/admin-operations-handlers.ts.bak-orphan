@@ -1,9 +1,4 @@
 /**
- * admin-week-handlers.ts
- * Set Week + Advance Week interactive flow + core advance-week logic.
- * Extracted from lib/admin-operations-handlers.ts.
- */
-/**
  * /admin-operations hub — admin-facing interactions with prefix ao_
  * Session TTL: 15 minutes (keyed by `${guildId}:${userId}`)
  */
@@ -34,11 +29,9 @@ import {
 } from "./db-helpers.js";
 import { WEEK_SEQUENCE, weekLabel } from "./week-helpers.js";
 import { lookupNflDivision } from "./constants.js";
-import { generateFranchiseArticle, generateWeekPreview } from "./franchise-article.js";
 import { runWildcardAutomation, runOffseasonHistoricalPost } from "./wildcard-automation.js";
 import { runEosAutoPost } from "./eos-auto-post.js";
 import { getPayoutValue, PAYOUT_KEYS } from "./payout-config.js";
-import { sendArticleChunked } from "./send-article.js";
 import { runWeeklyMatchupsFlow } from "./weekly-matchups-runner.js";
 import { createPrivateGameChannelsForWeek } from "./game-channel-manager.js";
 import { PLAYOFF_WEEK_META, runPlayoffMatchupsFlow, payoutPlayoffRoundResults, autoDivisionBonus } from "./playoff-matchups-runner.js";
@@ -46,7 +39,6 @@ import axios from "axios";
 import { autoPayoutPlayoffGotw, purgeChannel } from "./gotw-helpers.js";
 import { checkAndNotifyWaitlist } from "../commands/waitlist.js";
 import { buildMatchupBanner, resolveLogoBuf } from "./matchup-image.js";
-import { generateMatchupBreakdown } from "./matchup-ai-breakdown.js";
 import { globalLogoPath } from "./gcs-reader.js";
 import { buildAdminOpsEmbed, buildAdminOpsRows, buildAdminImportAdvanceEmbed, buildAdminImportAdvanceRows, buildAdminEconomyEmbed, buildAdminEconomyRows, buildAdminServerEmbed, buildAdminServerRows } from "../commands/admin-operations.js";
 import { buildPayoutHubEmbed, buildPayoutHubRows } from "./admin-payout-handlers.js";
@@ -61,7 +53,6 @@ import { buildLeagueDataMainMenu } from "./league-data-handlers.js";
 import { getServerSettings, buildSettingsEmbed, buildSettingsRows } from "./server-settings.js";
 import { setGuildChannel } from "./db-helpers.js";
 import { rebuildHistoricalChannel } from "./wildcard-automation.js";
-import OpenAI from "./openai-fallback.js";
 
 
 
@@ -558,61 +549,8 @@ async function handlePostCustomArticle(interaction: ButtonInteraction) {
 }
 
 async function handleModalCustomArticle(interaction: ModalSubmitInteraction) {
-  const guildId = interaction.guildId!;
-  const prompt  = interaction.fields.getTextInputValue("article_prompt").trim();
-
   await interaction.deferReply({ ephemeral: true });
-
-  try {
-    const headlinesChannelId = await getGuildChannel(guildId, CHANNEL_KEYS.HEADLINES);
-    if (!headlinesChannelId) {
-      await interaction.editReply({ content: "❌ No headlines channel configured. Set it via `/adminserver link_channel`." });
-      return;
-    }
-
-    const channel = (interaction.client.channels.cache.get(headlinesChannelId)
-      ?? await interaction.client.channels.fetch(headlinesChannelId).catch(() => null)) as TextChannel | null;
-    if (!channel?.isTextBased()) {
-      await interaction.editReply({ content: "❌ Headlines channel not found or inaccessible." });
-      return;
-    }
-
-    const response = await openaiClient.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: [
-            "You are an award-winning sports journalist covering The R.E.C. League — a competitive Madden NFL franchise simulation league.",
-            "Write in a bold, energetic, ESPN-style voice.",
-            "Use vivid prose paragraphs. Do NOT use markdown headers (##, ###) or bullet points — just flowing, punchy paragraphs.",
-            "Keep the article between 400–600 words unless the prompt implies a shorter piece.",
-            "IMPORTANT: Always start your response with a single line in exactly this format:",
-            "HEADLINE: <your headline here>",
-            "Then leave one blank line, then write the article body.",
-          ].join("\n"),
-        },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 1200,
-      temperature: 0.85,
-    });
-
-    const raw = response.choices[0]?.message?.content ?? "";
-    const lines = raw.split("\n");
-    const headlineLine = lines.find(l => l.startsWith("HEADLINE:"));
-    const headline = headlineLine ? headlineLine.replace("HEADLINE:", "").trim() : "Breaking News";
-    const bodyStart = headlineLine ? lines.indexOf(headlineLine) + 2 : 0;
-    const article   = lines.slice(bodyStart).join("\n").trim();
-
-    const header = `📰 **${headline}**\n\n`;
-    // article posting removed — sendArticleChunked archived
-
-    await interaction.editReply({ content: `✅ Custom article posted to <#${headlinesChannelId}>.` });
-  } catch (err) {
-    console.error("[admin-operations] Custom article error:", err);
-    await interaction.editReply({ content: `❌ Failed to generate or post article: ${err}` });
-  }
+  await interaction.editReply({ content: "❌ AI article generation has been removed." });
 }
 
 // ──  ──────────────────────────────────────────────────────────
@@ -2253,8 +2191,285 @@ async function handleSetSeasonNumConfirm(interaction: ButtonInteraction) {
 
 
 
+import {} from "./admin-week-handlers.js"; // week handlers
+import { buildRulesPages, handleRulesHub, handleRulesSection, handleRulesAdd, handleRulesEdit, handleRulesEditSel, handleRulesDelete, handleRulesPage, handleModalRulesAdd, handleModalRulesEdit, handleModalRulesDelete } from "./admin-rules-handlers.js";
 
-// ── Local AoSession type (mirrors admin-operations-handlers.ts) ───────────────
+// ── Set Season Number ──────────────────────────────────────────────────────────
+
+async function getMaxSeasons(guildId: string): Promise<number> {
+  const [row] = await db.select({ maxSeasons: serverSettingsTable.maxSeasons })
+    .from(serverSettingsTable)
+    .where(eq(serverSettingsTable.guildId, guildId))
+    .limit(1);
+  return row?.maxSeasons ?? 10;
+}
+
+async function handleSetSeasonNum(interaction: ButtonInteraction) {
+  const guildId   = interaction.guildId!;
+  const [season, maxSeasons] = await Promise.all([
+    getOrCreateActiveSeason(guildId),
+    getMaxSeasons(guildId),
+  ]);
+  const current = season.seasonNumber ?? 1;
+
+  const options = Array.from({ length: maxSeasons }, (_, i) => i + 1).map(n =>
+    new StringSelectMenuOptionBuilder()
+      .setLabel(`Season ${n}${n === current ? " (current)" : ""}`)
+      .setValue(String(n))
+      .setDefault(n === current),
+  );
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("ao_set_season_num_sel")
+    .setPlaceholder(`Current: Season ${current} of ${maxSeasons}`)
+    .addOptions(options);
+
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(Colors.Blue)
+        .setTitle("🔢 Set Season Number")
+        .setDescription(
+          `Select the season number to activate.\n\n` +
+          `Current season: **Season ${current} of ${maxSeasons}**\n\n` +
+          `⚠️ This sets the active season record only — it does **not** roll over inventories or player data. ` +
+          `Use **Advance Week** through Training Camp for a full season rollover.`
+        ),
+    ],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("ao_hub_back").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
+async function handleSetSeasonNumSel(interaction: StringSelectMenuInteraction) {
+  const guildId   = interaction.guildId!;
+  const target    = parseInt(interaction.values[0]!, 10);
+  const maxSeasons = await getMaxSeasons(guildId);
+  const isLast    = target >= maxSeasons;
+
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(isLast ? Colors.Orange : Colors.Blue)
+        .setTitle("🔢 Confirm Season Change")
+        .setDescription(
+          `Set the active season to **Season ${target} of ${maxSeasons}**?\n\n` +
+          (isLast ? "⚠️ This is the **final season** of the franchise.\n\n" : "") +
+          `This will activate (or create) the Season ${target} record. ` +
+          `Coin balances and inventories are unchanged.`
+        ),
+    ],
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`ao_set_season_num_confirm:${target}`)
+          .setLabel(`✅ Set to Season ${target}`)
+          .setStyle(isLast ? ButtonStyle.Danger : ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("ao_set_season_num").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
+async function handleSetSeasonNumConfirm(interaction: ButtonInteraction) {
+  const guildId    = interaction.guildId!;
+  const target     = parseInt(interaction.customId.split(":")[1]!, 10);
+  const maxSeasons = await getMaxSeasons(guildId);
+
+  // Check if this season already exists for THIS guild only.
+  const [existing] = await db.select().from(seasonsTable)
+    .where(and(eq(seasonsTable.guildId, guildId), eq(seasonsTable.seasonNumber, target)))
+    .limit(1);
+
+  // Deactivate all seasons for THIS guild only (not all guilds).
+  await db.update(seasonsTable)
+    .set({ isActive: false })
+    .where(eq(seasonsTable.guildId, guildId));
+
+  let activeSeason;
+  if (existing) {
+    // Activate the existing season record for this guild.
+    const [updated] = await db.update(seasonsTable)
+      .set({ isActive: true })
+      .where(and(eq(seasonsTable.guildId, guildId), eq(seasonsTable.seasonNumber, target)))
+      .returning();
+    activeSeason = updated;
+  } else {
+    // Season doesn't exist yet for this guild — create it.
+    const [created] = await db.insert(seasonsTable)
+      .values({ guildId, seasonNumber: target, isActive: true })
+      .returning();
+    activeSeason = created;
+  }
+
+  const isLast = target >= maxSeasons;
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(isLast ? Colors.Orange : Colors.Green)
+        .setTitle(`📅 Season Set to ${target} of ${maxSeasons}`)
+        .setDescription(
+          `The active season is now **Season ${target}**.\n\n` +
+          `Season ID: \`${activeSeason?.id ?? "?"}\`` +
+          (isLast ? "\n\n🏁 **This is the final season of the franchise.**" : "")
+        )
+        .setTimestamp(),
+    ],
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("ao_hub_back").setLabel("← Back to Hub").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
+
+import {} from "./admin-week-handlers.js"; // week handlers
+import { buildRulesPages, handleRulesHub, handleRulesSection, handleRulesAdd, handleRulesEdit, handleRulesEditSel, handleRulesDelete, handleRulesPage, handleModalRulesAdd, handleModalRulesEdit, handleModalRulesDelete } from "./admin-rules-handlers.js";
+
+// ── Set Season Number ──────────────────────────────────────────────────────────
+
+async function getMaxSeasons(guildId: string): Promise<number> {
+  const [row] = await db.select({ maxSeasons: serverSettingsTable.maxSeasons })
+    .from(serverSettingsTable)
+    .where(eq(serverSettingsTable.guildId, guildId))
+    .limit(1);
+  return row?.maxSeasons ?? 10;
+}
+
+async function handleSetSeasonNum(interaction: ButtonInteraction) {
+  const guildId   = interaction.guildId!;
+  const [season, maxSeasons] = await Promise.all([
+    getOrCreateActiveSeason(guildId),
+    getMaxSeasons(guildId),
+  ]);
+  const current = season.seasonNumber ?? 1;
+
+  const options = Array.from({ length: maxSeasons }, (_, i) => i + 1).map(n =>
+    new StringSelectMenuOptionBuilder()
+      .setLabel(`Season ${n}${n === current ? " (current)" : ""}`)
+      .setValue(String(n))
+      .setDefault(n === current),
+  );
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId("ao_set_season_num_sel")
+    .setPlaceholder(`Current: Season ${current} of ${maxSeasons}`)
+    .addOptions(options);
+
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(Colors.Blue)
+        .setTitle("🔢 Set Season Number")
+        .setDescription(
+          `Select the season number to activate.\n\n` +
+          `Current season: **Season ${current} of ${maxSeasons}**\n\n` +
+          `⚠️ This sets the active season record only — it does **not** roll over inventories or player data. ` +
+          `Use **Advance Week** through Training Camp for a full season rollover.`
+        ),
+    ],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("ao_hub_back").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
+async function handleSetSeasonNumSel(interaction: StringSelectMenuInteraction) {
+  const guildId   = interaction.guildId!;
+  const target    = parseInt(interaction.values[0]!, 10);
+  const maxSeasons = await getMaxSeasons(guildId);
+  const isLast    = target >= maxSeasons;
+
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(isLast ? Colors.Orange : Colors.Blue)
+        .setTitle("🔢 Confirm Season Change")
+        .setDescription(
+          `Set the active season to **Season ${target} of ${maxSeasons}**?\n\n` +
+          (isLast ? "⚠️ This is the **final season** of the franchise.\n\n" : "") +
+          `This will activate (or create) the Season ${target} record. ` +
+          `Coin balances and inventories are unchanged.`
+        ),
+    ],
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`ao_set_season_num_confirm:${target}`)
+          .setLabel(`✅ Set to Season ${target}`)
+          .setStyle(isLast ? ButtonStyle.Danger : ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("ao_set_season_num").setLabel("← Back").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
+async function handleSetSeasonNumConfirm(interaction: ButtonInteraction) {
+  const guildId    = interaction.guildId!;
+  const target     = parseInt(interaction.customId.split(":")[1]!, 10);
+  const maxSeasons = await getMaxSeasons(guildId);
+
+  // Check if this season already exists for THIS guild only.
+  const [existing] = await db.select().from(seasonsTable)
+    .where(and(eq(seasonsTable.guildId, guildId), eq(seasonsTable.seasonNumber, target)))
+    .limit(1);
+
+  // Deactivate all seasons for THIS guild only (not all guilds).
+  await db.update(seasonsTable)
+    .set({ isActive: false })
+    .where(eq(seasonsTable.guildId, guildId));
+
+  let activeSeason;
+  if (existing) {
+    // Activate the existing season record for this guild.
+    const [updated] = await db.update(seasonsTable)
+      .set({ isActive: true })
+      .where(and(eq(seasonsTable.guildId, guildId), eq(seasonsTable.seasonNumber, target)))
+      .returning();
+    activeSeason = updated;
+  } else {
+    // Season doesn't exist yet for this guild — create it.
+    const [created] = await db.insert(seasonsTable)
+      .values({ guildId, seasonNumber: target, isActive: true })
+      .returning();
+    activeSeason = created;
+  }
+
+  const isLast = target >= maxSeasons;
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(isLast ? Colors.Orange : Colors.Green)
+        .setTitle(`📅 Season Set to ${target} of ${maxSeasons}`)
+        .setDescription(
+          `The active season is now **Season ${target}**.\n\n` +
+          `Season ID: \`${activeSeason?.id ?? "?"}\`` +
+          (isLast ? "\n\n🏁 **This is the final season of the franchise.**" : "")
+        )
+        .setTimestamp(),
+    ],
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId("ao_hub_back").setLabel("← Back to Hub").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("ao_hub_close").setLabel("✖ Close").setStyle(ButtonStyle.Danger),
+      ),
+    ],
+  });
+}
+
 
 
 

@@ -155,6 +155,8 @@ async function showAdminDepartmentMenu(interaction: any, title: string, descript
     components,
   });
 }
+    return;
+  }
 
   if (selected === "manage_economy") {
     await interaction.update({
